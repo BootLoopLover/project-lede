@@ -61,10 +61,6 @@ while true; do
     esac
 done
 
-echo "[TASK] Applying NAND support patch..."
-cp target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch \
-   target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch || true
-
 # --- Git Tag Selection ---
 while true; do
     echo ""
@@ -100,6 +96,18 @@ while true; do
             ;;
     esac
 done
+
+# --- Patch NAND Support (Optional) ---
+echo "[TASK] Checking for NAND support patch..."
+PATCH_SRC="target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
+PATCH_DST="target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
+
+if [ -f "$PATCH_SRC" ]; then
+    echo "[INFO] Copying NAND support patch from 6.6 to 6.1..."
+    cp "$PATCH_SRC" "$PATCH_DST"
+else
+    echo "[INFO] NAND patch not found at $PATCH_SRC. Skipping patch copy."
+fi
 
 # --- Preset Configuration ---
 skip_menuconfig=false
