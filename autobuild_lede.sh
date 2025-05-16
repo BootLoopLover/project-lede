@@ -67,43 +67,6 @@ select_build_mode() {
     done
 }
 
-# --- Fungsi checkout git tag ---
-select_git_tag() {
-    while true; do
-        echo ""
-        echo "========== Git Tag Checkout (Optional) ========"
-        echo "1. List and checkout available tags"
-        echo "2. Skip"
-        echo "================================================"
-        read -rp "Select option [1-2]: " TAG_OPTION
-        case "$TAG_OPTION" in
-            1)
-                TAGS=$(git tag)
-                if [ -z "$TAGS" ]; then
-                    echo "[INFO] No Git tags found in repository."
-                    break
-                fi
-                echo "[AVAILABLE TAGS]"
-                select tag in $TAGS; do
-                    if [ -n "$tag" ]; then
-                        git checkout "$tag"
-                        echo -e "${GREEN}[INFO] Checked out tag: $tag${NC}"
-                        break 2
-                    else
-                        echo -e "${RED}[ERROR] Invalid selection.${NC}"
-                    fi
-                done
-                ;;
-            2)
-                break
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid input. Please select 1 or 2.${NC}"
-                ;;
-        esac
-    done
-}
-
 # --- Fungsi apply NAND patch ---
 apply_nand_patch() {
     echo -e "${BLUE}[TASK] Checking for NAND support patch...${NC}"
@@ -116,6 +79,31 @@ apply_nand_patch() {
     else
         echo -e "${YELLOW}[INFO] NAND patch not found at ${PATCH_SRC}. Skipping patch copy.${NC}"
     fi
+}
+
+# --- Fungsi update feeds ---
+update_feeds() {
+    while true; do
+        echo ""
+        echo "============= Feed Update ==================="
+        echo "1. Run 'feeds update' and 'feeds install'"
+        echo "2. Skip"
+        echo "=============================================="
+        read -rp "Select option [1-2]: " FEED_UPDATE
+        case "$FEED_UPDATE" in
+            1)
+                ./scripts/feeds update -a
+                ./scripts/feeds install -a
+                break
+                ;;
+            2)
+                break
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid selection.${NC}"
+                ;;
+        esac
+    done
 }
 
 # --- Fungsi clone dan copy preset ---
@@ -225,6 +213,44 @@ update_feeds() {
         esac
     done
 }
+
+# --- Fungsi checkout git tag ---
+select_git_tag() {
+    while true; do
+        echo ""
+        echo "========== Git Tag Checkout (Optional) ========"
+        echo "1. List and checkout available tags"
+        echo "2. Skip"
+        echo "================================================"
+        read -rp "Select option [1-2]: " TAG_OPTION
+        case "$TAG_OPTION" in
+            1)
+                TAGS=$(git tag)
+                if [ -z "$TAGS" ]; then
+                    echo "[INFO] No Git tags found in repository."
+                    break
+                fi
+                echo "[AVAILABLE TAGS]"
+                select tag in $TAGS; do
+                    if [ -n "$tag" ]; then
+                        git checkout "$tag"
+                        echo -e "${GREEN}[INFO] Checked out tag: $tag${NC}"
+                        break 2
+                    else
+                        echo -e "${RED}[ERROR] Invalid selection.${NC}"
+                    fi
+                done
+                ;;
+            2)
+                break
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid input. Please select 1 or 2.${NC}"
+                ;;
+        esac
+    done
+}
+
 
 # --- Fungsi menu build ---
 build_menu() {
