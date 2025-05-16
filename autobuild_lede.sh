@@ -1,6 +1,6 @@
 #!/bin/bash
 #--------------------------------------------------------
-# LEDE Autobuild Script - Technical Style with Git Checkout & Preset
+# OpenWrt Rebuild Script - Technical Style with Folder Selection
 # Author: Pakalolo Waraso
 #--------------------------------------------------------
 
@@ -27,48 +27,54 @@ set -e
 while true; do
 	echo ""
 	echo "========== Build Mode =========="
-	echo "1. Fresh Build (clone baru, bersihkan folder sebelumnya)"
-	echo "2. Rebuild (gunakan folder 'lede' yang sudah ada)"
+	echo "1. Fresh Build"
+	echo "2. Rebuild"
 	echo "0. Exit"
-	echo "==============================="
 	read -rp "Select build mode [0-2]: " BUILD_MODE
 
 	case "$BUILD_MODE" in
 		1)
-			[ -d lede ] && echo "[INFO] Removing existing 'lede' folder for fresh build..." && rm -rf lede
-			echo "[TASK] Cloning LEDE source repository..."
+			rm -rf lede
 			git clone https://github.com/coolsnowwolf/lede.git
 			cd lede
 
-			# Pilih tag atau branch
-			echo ""
-			echo "========== Git Branch/Tag =========="
-			read -rp "Enter Git branch or tag to checkout (leave blank to skip): " GIT_REF
-			if [ -n "$GIT_REF" ]; then
-				echo "[TASK] Checking out to '$GIT_REF'..."
-				git fetch --all
-				git checkout "$GIT_REF" || {
-					echo -e "${RED}[ERROR] Failed to checkout to $GIT_REF.${NC}"
-					exit 1
-				}
-			else
-				echo "[INFO] Skipping git checkout. Using default branch."
+			# === Git Tag Selection ===
+			echo -e "${BLUE}Fetching available Git tags...${NC}"
+			git fetch --tags
+			tags=$(git tag | sort -V)
+			if [[ -n "$tags" ]]; then
+				echo "========== Available Git Tags =========="
+				echo "$tags" | nl
+				echo "========================================"
+				read -rp "Enter tag number to checkout (leave blank to skip): " tag_number
+				if [[ "$tag_number" =~ ^[0-9]+$ ]]; then
+					selected_tag=$(echo "$tags" | sed -n "${tag_number}p")
+					if [[ -n "$selected_tag" ]]; then
+						echo -e "${BLUE}Checking out tag: ${selected_tag}${NC}"
+						git checkout "$selected_tag"
+					else
+						echo -e "${RED}Invalid selection. Skipping tag checkout.${NC}"
+					fi
+				else
+					echo -e "${YELLOW}Skipping tag checkout.${NC}"
+				fi
 			fi
-
 			break
 			;;
 		2)
-			[ ! -d lede ] && echo -e "${RED}[ERROR] Folder 'lede' tidak ditemukan. Tidak bisa rebuild.${NC}" && exit 1
-			echo "[INFO] Using existing 'lede' folder for rebuild..."
+			if [ ! -d lede ]; then
+				echo -e "${RED}[ERROR] Folder 'lede' tidak ditemukan.${NC}"
+				exit 1
+			fi
 			cd lede
 			break
 			;;
 		0)
-			echo "[INFO] Exiting script."
+			echo "[INFO] Exiting."
 			exit 0
 			;;
 		*)
-			echo "[ERROR] Invalid input. Please enter 0, 1, or 2."
+			echo "[ERROR] Invalid input."
 			;;
 	esac
 done
@@ -77,42 +83,45 @@ echo "[TASK] Applying NAND support patch..."
 cp target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch \
    target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch || true
 
-# Preset Config Menu
+# === PILIH PRESET CONFIG ===
 while true; do
 	echo ""
-	echo "========== Preset Configuration =========="
-	echo "1. Use preset from github.com/BootLoopLover/preset-lede"
-	echo "2. Skip preset (manual config)"
-	echo "=========================================="
-	read -rp "Select option [1-2]: " PRESET_CHOICE
+	echo "========== Select Config Preset =========="
+	echo "1. Use preset from: BootLoopLover/preset-lede (.config)"
+	echo "2. Skip and use default config"
+	echo "0. Exit"
+	read -rp "Choose option [0-2]: " PRESET_CHOICE
 
 	case "$PRESET_CHOICE" in
 		1)
 			echo "[TASK] Downloading preset config..."
-			wget -O .config https://raw.githubusercontent.com/BootLoopLover/preset-lede/main/config
+			wget -O .config https://raw.githubusercontent.com/BootLoopLover/preset-lede/main/.config
 			break
 			;;
 		2)
-			echo "[INFO] Skipping preset config."
+			echo "[INFO] Using default (empty) config."
 			break
 			;;
+		0)
+			echo "[INFO] Exit requested."
+			exit 0
+			;;
 		*)
-			echo "[ERROR] Invalid input. Please enter 1 or 2."
+			echo "[ERROR] Invalid input."
 			;;
 	esac
 done
 
-# Feed configuration menu
+# Feed configuration
 while true; do
 	echo ""
 	echo "========== Feed Configuration =========="
 	echo "1. Add feed: custompackage"
 	echo "2. Add feed: php7"
-	echo "3. Add both feeds"
-	echo "4. Skip feed modification"
-	echo "0. Abort and exit"
-	echo "========================================"
-	read -rp "Select option [0-4]: " FEED_CHOICE
+	echo "3. Add both"
+	echo "4. Skip"
+	echo "0. Exit"
+	read -rp "Choose [0-4]: " FEED_CHOICE
 
 	case "$FEED_CHOICE" in
 		1)
@@ -133,84 +142,79 @@ while true; do
 			break
 			;;
 		0)
-			echo "[ABORT] Process aborted by user."
+			echo "[ABORT] Exit."
 			exit 0
 			;;
 		*)
-			echo "[ERROR] Invalid input. Please enter a number between 0 and 4."
+			echo "[ERROR] Invalid input."
 			;;
 	esac
 done
 
-# Feed update menu
+# Feed update
 while true; do
 	echo ""
 	echo "========== Feed Update =========="
-	echo "1. Run feeds update and install"
-	echo "2. Skip feeds update/install"
-	echo "=================================="
-	read -rp "Select option [1-2]: " FEED_UPDATE_CHOICE
+	echo "1. Update and install"
+	echo "2. Skip"
+	read -rp "Select [1-2]: " FEED_UPDATE_CHOICE
 
 	case "$FEED_UPDATE_CHOICE" in
 		1)
-			echo "[TASK] Running feeds update and install..."
 			./scripts/feeds update -a
 			./scripts/feeds install -a
 			break
 			;;
 		2)
-			echo "[INFO] Skipping feeds update and install."
+			echo "[INFO] Skipping feed update."
 			break
 			;;
 		*)
-			echo "[ERROR] Invalid input. Please enter 1 or 2."
+			echo "[ERROR] Invalid input."
 			;;
 	esac
 done
 
-# Build menu
+# Build Menu
 while true; do
 	echo ""
 	echo "=========== Build Menu ==========="
 	echo "1. Run make menuconfig"
 	echo "2. Start build directly"
-	echo "3. Exit without building"
-	echo "=================================="
-	read -rp "Select option [1-3]: " BUILD_CHOICE
+	echo "3. Exit"
+	read -rp "Select [1-3]: " BUILD_CHOICE
 
 	case "$BUILD_CHOICE" in
 		1)
-			echo "[TASK] Starting build configuration (make menuconfig)..."
 			make menuconfig
 			read -rp "Proceed to build? [y/N]: " CONFIRM_BUILD
-			[[ "$CONFIRM_BUILD" =~ ^[Yy]$ ]] && break || { echo "[INFO] Build cancelled by user."; exit 0; }
+			[[ "$CONFIRM_BUILD" =~ ^[Yy]$ ]] || exit 0
+			break
 			;;
 		2)
 			break
 			;;
 		3)
-			echo "[INFO] Exiting. You are still inside the 'lede' directory."
+			echo "[INFO] Exiting. You are still in ./lede"
 			exit 0
 			;;
 		*)
-			echo "[ERROR] Invalid input. Please enter a number between 1 and 3."
+			echo "[ERROR] Invalid input."
 			;;
 	esac
 done
 
-# === Start Build ===
-echo "[TASK] Starting firmware build..."
+# Build firmware
+echo "[TASK] Building firmware..."
 BUILD_START=$(date +%s)
 
 if ! make -j$(nproc); then
-	echo -e "${YELLOW}[WARN] Initial build failed. Retrying with verbose output (make -j10 V=s)...${NC}"
-	if ! make -j10 V=s; then
-		echo -e "${RED}[ERROR] Build failed again with verbose output. Aborting.${NC}"
-		exit 1
-	fi
+    echo -e "${YELLOW}[WARN] Build failed. Retrying with verbose...${NC}"
+    if ! make -j10 V=s; then
+        echo -e "${RED}[ERROR] Build failed again. Abort.${NC}"
+        exit 1
+    fi
 fi
 
 BUILD_END=$(date +%s)
-BUILD_DURATION=$((BUILD_END - BUILD_START))
-echo ""
-echo -e "${GREEN}[DONE] Build completed in: $(format_duration $BUILD_DURATION)${NC}"
+echo -e "${GREEN}[DONE] Build completed in: $(format_duration $((BUILD_END - BUILD_START)))${NC}"
