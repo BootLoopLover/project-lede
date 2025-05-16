@@ -4,114 +4,121 @@
 # Author: Pakalolo Waraso
 #--------------------------------------------------------
 
+# === Warna untuk output terminal ===
 BLUE='\033[1;34m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
 RED='\033[1;31m'
 NC='\033[0m'
 
+# --- Fungsi format durasi (detik ke hh:mm:ss) ---
 format_duration() {
     local T=$1
     printf '%02d:%02d:%02d\n' $((T/3600)) $((T%3600/60)) $((T%60))
 }
 
-clear
-echo "============== LEDE Firmware Autobuilder =============="
-echo -e "${BLUE}Firmware Modification Project${NC}"
-echo -e "${BLUE}Author: Pakalolo Waraso${NC}"
-echo -e "${BLUE}Special Thanks: Awiks Telegram Group${NC}"
-echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
-echo -e "${BLUE}Maintainer: https://github.com/BootLoopLover${NC}"
-echo "======================================================="
+# --- Fungsi tampilkan branding ---
+show_branding() {
+    clear
+    echo "============== LEDE Firmware Autobuilder =============="
+    echo -e "${BLUE}Firmware Modification Project${NC}"
+    echo -e "${BLUE}Author: Pakalolo Waraso${NC}"
+    echo -e "${BLUE}Special Thanks: Awiks Telegram Group${NC}"
+    echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
+    echo -e "${BLUE}Maintainer: https://github.com/BootLoopLover${NC}"
+    echo "======================================================="
+}
 
-set -e
-
-# --- Build Mode Selection ---
-while true; do
-    echo ""
-    echo "============ Build Mode Selection =============="
-    echo "1. Fresh Build (clean and clone)"
-    echo "2. Rebuild (use existing 'lede' directory)"
-    echo "0. Exit"
-    echo "================================================"
-    read -rp "Select option [0-2]: " BUILD_MODE
-    case "$BUILD_MODE" in
-        1)
-            rm -rf lede
-            echo "[INFO] Cloning LEDE source..."
-            git clone https://github.com/coolsnowwolf/lede.git
-            cd lede
-            break
-            ;;
-        2)
-            if [ ! -d lede ]; then
-                echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
-                exit 1
-            fi
-            cd lede
-            break
-            ;;
-        0)
-            echo "[INFO] Exiting script."
-            exit 0
-            ;;
-        *)
-            echo "[ERROR] Invalid selection. Please enter a number between 0 and 2."
-            ;;
-    esac
-done
-
-# --- Git Tag Selection ---
-while true; do
-    echo ""
-    echo "========== Git Tag Checkout (Optional) ========"
-    echo "1. List and checkout available tags"
-    echo "2. Skip"
-    echo "================================================"
-    read -rp "Select option [1-2]: " TAG_OPTION
-    case "$TAG_OPTION" in
-        1)
-            TAGS=$(git tag)
-            if [ -z "$TAGS" ]; then
-                echo "[INFO] No Git tags found in repository."
+# --- Fungsi pilih mode build ---
+select_build_mode() {
+    while true; do
+        echo ""
+        echo "============ Build Mode Selection =============="
+        echo "1. Fresh Build (clean and clone)"
+        echo "2. Rebuild (use existing 'lede' directory)"
+        echo "0. Exit"
+        echo "================================================"
+        read -rp "Select option [0-2]: " BUILD_MODE
+        case "$BUILD_MODE" in
+            1)
+                echo "[INFO] Starting fresh build..."
+                rm -rf lede
+                git clone https://github.com/coolsnowwolf/lede.git
+                cd lede
                 break
-            fi
-            echo "[AVAILABLE TAGS]"
-            select tag in $TAGS; do
-                if [ -n "$tag" ]; then
-                    git checkout "$tag"
-                    echo "[INFO] Checked out tag: $tag"
-                    break
-                else
-                    echo "[ERROR] Invalid selection."
+                ;;
+            2)
+                if [ ! -d lede ]; then
+                    echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
+                    exit 1
                 fi
-            done
-            break
-            ;;
-        2)
-            break
-            ;;
-        *)
-            echo "[ERROR] Invalid input. Please select 1 or 2."
-            ;;
-    esac
-done
+                cd lede
+                echo "[INFO] Using existing 'lede' directory."
+                break
+                ;;
+            0)
+                echo "[INFO] Exiting script."
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid selection. Please enter a number between 0 and 2.${NC}"
+                ;;
+        esac
+    done
+}
 
-# --- Patch NAND Support (Optional) ---
-echo "[TASK] Checking for NAND support patch..."
-PATCH_SRC="target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
-PATCH_DST="target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
+# --- Fungsi checkout git tag ---
+select_git_tag() {
+    while true; do
+        echo ""
+        echo "========== Git Tag Checkout (Optional) ========"
+        echo "1. List and checkout available tags"
+        echo "2. Skip"
+        echo "================================================"
+        read -rp "Select option [1-2]: " TAG_OPTION
+        case "$TAG_OPTION" in
+            1)
+                TAGS=$(git tag)
+                if [ -z "$TAGS" ]; then
+                    echo "[INFO] No Git tags found in repository."
+                    break
+                fi
+                echo "[AVAILABLE TAGS]"
+                select tag in $TAGS; do
+                    if [ -n "$tag" ]; then
+                        git checkout "$tag"
+                        echo -e "${GREEN}[INFO] Checked out tag: $tag${NC}"
+                        break 2
+                    else
+                        echo -e "${RED}[ERROR] Invalid selection.${NC}"
+                    fi
+                done
+                ;;
+            2)
+                break
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid input. Please select 1 or 2.${NC}"
+                ;;
+        esac
+    done
+}
 
-if [ -f "$PATCH_SRC" ]; then
-    echo "[INFO] Copying NAND support patch from 6.6 to 6.1..."
-    cp "$PATCH_SRC" "$PATCH_DST"
-else
-    echo "[INFO] NAND patch not found at $PATCH_SRC. Skipping patch copy."
-fi
+# --- Fungsi apply NAND patch ---
+apply_nand_patch() {
+    echo -e "${BLUE}[TASK] Checking for NAND support patch...${NC}"
+    PATCH_SRC="target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
+    PATCH_DST="target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
 
-# --- Preset Configuration ---
-skip_menuconfig=false
+    if [ -f "$PATCH_SRC" ]; then
+        cp "$PATCH_SRC" "$PATCH_DST"
+        echo -e "${GREEN}[INFO] NAND patch copied successfully.${NC}"
+    else
+        echo -e "${YELLOW}[INFO] NAND patch not found at ${PATCH_SRC}. Skipping patch copy.${NC}"
+    fi
+}
 
+# --- Fungsi clone dan copy preset ---
 clone_and_copy_preset() {
     local repo_url=$1
     local folder_name=$2
@@ -130,131 +137,158 @@ clone_and_copy_preset() {
     if [ -f "../$folder_name/config-preset" ]; then
         cp "../$folder_name/config-preset" .config
         skip_menuconfig=true
-        echo "[INFO] Applied preset: config-preset. Skipping menuconfig."
+        echo -e "${GREEN}[INFO] Applied preset: config-preset. Skipping menuconfig.${NC}"
     else
         echo -e "${YELLOW}[WARNING] No preset config file found in ${folder_name}. Continuing with menuconfig.${NC}"
         skip_menuconfig=false
     fi
 }
 
-echo ""
-echo "============ Preset Configuration ============="
-echo "1. Clone and use preset from 'preset-lede' repo"
-echo "2. Skip"
-echo "==============================================="
-read -rp "Select option [1-2]: " PRESET_OPTION
-
-case "$PRESET_OPTION" in
-    1)
-        clone_and_copy_preset "https://github.com/BootLoopLover/preset-lede.git" "preset-lede"
-        ;;
-    2)
-        echo "[INFO] Preset selection skipped."
-        ;;
-    *)
-        echo "[ERROR] Invalid input. Proceeding without preset."
-        ;;
-esac
-
-# --- Feed Configuration ---
-while true; do
+# --- Fungsi konfigurasi preset ---
+preset_configuration() {
     echo ""
-    echo "=========== Feed Configuration ==========="
-    echo "1. Add feed: custompackage"
-    echo "2. Add feed: php7"
-    echo "3. Add both feeds"
-    echo "4. Skip"
-    echo "==========================================="
-    read -rp "Select option [1-4]: " FEED_OPTION
-    case "$FEED_OPTION" in
-        1)
-            echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
-            break
-            ;;
-        2)
-            echo 'src-git php7 https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
-            break
-            ;;
-        3)
-            echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
-            echo 'src-git php7 https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
-            break
-            ;;
-        4)
-            break
-            ;;
-        *)
-            echo "[ERROR] Invalid selection."
-            ;;
-    esac
-done
-
-# --- Feeds Update ---
-while true; do
-    echo ""
-    echo "============= Feed Update ==================="
-    echo "1. Run 'feeds update' and 'feeds install'"
+    echo "============ Preset Configuration ============="
+    echo "1. Clone and use preset from 'preset-lede' repo"
     echo "2. Skip"
-    echo "=============================================="
-    read -rp "Select option [1-2]: " FEED_UPDATE
-    case "$FEED_UPDATE" in
+    echo "==============================================="
+    read -rp "Select option [1-2]: " PRESET_OPTION
+
+    case "$PRESET_OPTION" in
         1)
-            ./scripts/feeds update -a
-            ./scripts/feeds install -a
-            break
+            clone_and_copy_preset "https://github.com/BootLoopLover/preset-lede.git" "preset-lede"
             ;;
         2)
-            break
+            echo "[INFO] Preset selection skipped."
             ;;
         *)
-            echo "[ERROR] Invalid selection."
+            echo -e "${RED}[ERROR] Invalid input. Proceeding without preset.${NC}"
             ;;
     esac
-done
+}
 
-# --- Build Menu ---
-while true; do
-    echo ""
-    echo "============= Build Menu =============="
-    echo "1. Run 'make menuconfig'"
-    echo "2. Start build immediately"
-    echo "3. Exit"
-    echo "======================================="
-    if [ "$skip_menuconfig" = true ]; then
-        echo "[INFO] Skipping menuconfig as preset config has been applied."
-        break
-    fi
-    read -rp "Select option [1-3]: " BUILD_CHOICE
-    case "$BUILD_CHOICE" in
-        1)
-            make menuconfig
-            read -rp "Proceed to build? [y/N]: " CONFIRM
-            [[ "$CONFIRM" =~ ^[Yy]$ ]] && break || exit 0
-            ;;
-        2)
+# --- Fungsi konfigurasi feeds ---
+feed_configuration() {
+    while true; do
+        echo ""
+        echo "=========== Feed Configuration ==========="
+        echo "1. Add feed: custompackage"
+        echo "2. Add feed: php7"
+        echo "3. Add both feeds"
+        echo "4. Skip"
+        echo "==========================================="
+        read -rp "Select option [1-4]: " FEED_OPTION
+        case "$FEED_OPTION" in
+            1)
+                echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
+                break
+                ;;
+            2)
+                echo 'src-git php7 https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+                break
+                ;;
+            3)
+                echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
+                echo 'src-git php7 https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+                break
+                ;;
+            4)
+                break
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid selection.${NC}"
+                ;;
+        esac
+    done
+}
+
+# --- Fungsi update feeds ---
+update_feeds() {
+    while true; do
+        echo ""
+        echo "============= Feed Update ==================="
+        echo "1. Run 'feeds update' and 'feeds install'"
+        echo "2. Skip"
+        echo "=============================================="
+        read -rp "Select option [1-2]: " FEED_UPDATE
+        case "$FEED_UPDATE" in
+            1)
+                ./scripts/feeds update -a
+                ./scripts/feeds install -a
+                break
+                ;;
+            2)
+                break
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid selection.${NC}"
+                ;;
+        esac
+    done
+}
+
+# --- Fungsi menu build ---
+build_menu() {
+    while true; do
+        echo ""
+        echo "============= Build Menu =============="
+        echo "1. Run 'make menuconfig'"
+        echo "2. Start build immediately"
+        echo "3. Exit"
+        echo "======================================="
+        if [ "$skip_menuconfig" = true ]; then
+            echo -e "${YELLOW}[INFO] Skipping menuconfig as preset config has been applied.${NC}"
             break
-            ;;
-        3)
-            exit 0
-            ;;
-        *)
-            echo "[ERROR] Invalid input."
-            ;;
-    esac
-done
+        fi
+        read -rp "Select option [1-3]: " BUILD_CHOICE
+        case "$BUILD_CHOICE" in
+            1)
+                make menuconfig
+                read -rp "Proceed to build? [y/N]: " CONFIRM
+                [[ "$CONFIRM" =~ ^[Yy]$ ]] && break || exit 0
+                ;;
+            2)
+                break
+                ;;
+            3)
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid input.${NC}"
+                ;;
+        esac
+    done
+}
 
-# --- Build Process ---
-echo "[TASK] Starting build process..."
-BUILD_START=$(date +%s)
+# --- Fungsi proses build ---
+start_build() {
+    echo "[TASK] Starting build process..."
+    local BUILD_START
+    local BUILD_END
+    local BUILD_DURATION
 
-if ! make -j$(nproc); then
-    echo -e "${YELLOW}[WARNING] Build failed. Retrying with verbose output...${NC}"
-    if ! make -j$(nproc) V=s; then
-        echo -e "${RED}[ERROR] Build failed again. Aborting.${NC}"
-        exit 1
+    BUILD_START=$(date +%s)
+
+    if ! make -j"$(nproc)"; then
+        echo -e "${YELLOW}[WARNING] Build failed. Retrying with verbose output...${NC}"
+        if ! make -j"$(nproc)" V=s; then
+            echo -e "${RED}[ERROR] Build failed again. Aborting.${NC}"
+            exit 1
+        fi
     fi
-fi
 
-BUILD_END=$(date +%s)
-BUILD_DURATION=$((BUILD_END - BUILD_START))
-echo -e "${GREEN}[SUCCESS] Build completed in: $(format_duration $BUILD_DURATION)${NC}"
+    BUILD_END=$(date +%s)
+    BUILD_DURATION=$((BUILD_END - BUILD_START))
+    echo -e "${GREEN}[SUCCESS] Build completed in: $(format_duration $BUILD_DURATION)${NC}"
+}
+
+# === MAIN SCRIPT EXECUTION ===
+
+show_branding
+select_build_mode
+select_git_tag
+apply_nand_patch
+preset_configuration
+feed_configuration
+update_feeds
+build_menu
+start_build
