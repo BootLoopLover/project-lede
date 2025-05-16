@@ -17,11 +17,11 @@ format_duration() {
 }
 
 clear
-echo -e "${BLUE}Project Lede${NC}"
-echo "--------------------------------------------------------"
+echo "========== Project Lede =========="
 echo -e "${BLUE}Firmware Modifications Project${NC}"
 echo -e "${BLUE}Github : https://github.com/BootLoopLover${NC}"
 echo -e "${BLUE}Telegram : t.me/PakaloloWaras0${NC}"
+echo "=================================="
 
 set -e
 
