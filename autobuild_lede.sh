@@ -25,9 +25,45 @@ echo "=================================="
 
 set -e
 
-echo "[TASK] Cloning LEDE source repository..."
-git clone https://github.com/coolsnowwolf/lede.git
-cd lede
+# Pilihan Build Mode: Fresh atau Rebuild
+while true; do
+	echo ""
+	echo "========== Build Mode =========="
+	echo "1. Fresh Build (clone baru, bersihkan folder sebelumnya)"
+	echo "2. Rebuild (gunakan folder 'lede' yang sudah ada)"
+	echo "0. Exit"
+	echo "==============================="
+	read -rp "Select build mode [0-2]: " BUILD_MODE
+
+	case "$BUILD_MODE" in
+		1)
+			if [ -d lede ]; then
+				echo "[INFO] Removing existing 'lede' folder for fresh build..."
+				rm -rf lede
+			fi
+			echo "[TASK] Cloning LEDE source repository..."
+			git clone https://github.com/coolsnowwolf/lede.git
+			cd lede
+			break
+			;;
+		2)
+			if [ ! -d lede ]; then
+				echo -e "${RED}[ERROR] Folder 'lede' tidak ditemukan. Tidak bisa rebuild.${NC}"
+				exit 1
+			fi
+			echo "[INFO] Using existing 'lede' folder for rebuild..."
+			cd lede
+			break
+			;;
+		0)
+			echo "[INFO] Exiting script."
+			exit 0
+			;;
+		*)
+			echo "[ERROR] Invalid input. Please enter 0, 1, or 2."
+			;;
+	esac
+done
 
 echo "[TASK] Applying NAND support patch..."
 cp target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch \
