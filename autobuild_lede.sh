@@ -15,6 +15,41 @@ format_duration() {
 	printf '%02d:%02d:%02d\n' $((T/3600)) $((T%3600/60)) $((T%60))
 }
 
+clone_and_copy_preset() {
+	local repo_url=$1
+	local folder_name=$2
+
+	echo -e "${BLUE}Cloning ${folder_name}...${NC}"
+	git clone "$repo_url" "../$folder_name" || {
+		echo -e "${RED}Failed to clone ${folder_name}.${NC}"
+		return 1
+	}
+
+	# Salin folder 'files' dari preset ke direktori build jika ada
+	if [ -d "../$folder_name/files" ]; then
+		echo "[INFO] Copying 'files' directory from preset..."
+		mkdir -p files
+		cp -r "../$folder_name/files/"* files/
+	fi
+
+	PRESET_LIST=$(find "../$folder_name" -type f -name "*.config")
+	if [ -z "$PRESET_LIST" ]; then
+		echo -e "${RED}[ERROR] No preset configuration files found in $folder_name.${NC}"
+		return 1
+	fi
+
+	echo "[AVAILABLE PRESETS]"
+	select preset in $PRESET_LIST; do
+		if [[ -n "$preset" ]]; then
+			cp "$preset" .config
+			echo "[INFO] Applied preset: $(basename "$preset")"
+			break
+		else
+			echo "[ERROR] Invalid selection."
+		fi
+	done
+}
+
 clear
 echo "========== LEDE Firmware Autobuilder =========="
 echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
@@ -26,11 +61,11 @@ set -e
 # --- Build Mode Selection ---
 while true; do
 	echo ""
-	echo "=== Build Mode Selection ==="
+	echo "============ Build Mode Selection =============="
 	echo "1. Fresh Build (clean and clone)"
 	echo "2. Rebuild (use existing 'lede' directory)"
 	echo "0. Exit"
-        echo "================================================"
+	echo "================================================"
 	read -rp "Select option [0-2]: " BUILD_MODE
 	case "$BUILD_MODE" in
 		1)
@@ -61,10 +96,10 @@ done
 # --- Git Tag Selection ---
 while true; do
 	echo ""
-	echo "=== Git Tag Checkout (Optional) ==="
+	echo "========= Git Tag Checkout (Optional) =========="
 	echo "1. List and checkout available tags"
 	echo "2. Skip"
-        echo "================================================"
+	echo "================================================"
 	read -rp "Select option [1-2]: " TAG_OPTION
 	case "$TAG_OPTION" in
 		1)
@@ -97,32 +132,19 @@ done
 # --- Preset Configuration Selection ---
 while true; do
 	echo ""
-	echo "=== Preset Configuration ==="
+	echo "============ Preset Configuration ============="
 	echo "1. Clone and use preset from 'preset-lede' repo"
 	echo "2. Skip"
-        echo "================================================"
+	echo "================================================"
 	read -rp "Select option [1-2]: " PRESET_OPTION
 	case "$PRESET_OPTION" in
 		1)
-			echo "[INFO] Cloning preset-lede repository..."
-			rm -rf ../preset-lede
-			git clone https://github.com/BootLoopLover/preset-lede.git ../preset-lede
-			PRESET_LIST=$(find ../preset-lede -type f -name "*.config")
-			if [ -z "$PRESET_LIST" ]; then
-				echo -e "${RED}[ERROR] No preset configuration files found.${NC}"
+			if clone_and_copy_preset "https://github.com/BootLoopLover/preset-lede.git" "preset-lede"; then
+				break
+			else
+				echo -e "${RED}[ERROR] Failed to apply preset.${NC}"
 				exit 1
 			fi
-			echo "[AVAILABLE PRESETS]"
-			select preset in $PRESET_LIST; do
-				if [[ -n "$preset" ]]; then
-					cp "$preset" .config
-					echo "[INFO] Applied preset: $(basename "$preset")"
-					break
-				else
-					echo "[ERROR] Invalid selection."
-				fi
-			done
-			break
 			;;
 		2)
 			echo "[INFO] Preset selection skipped."
@@ -137,12 +159,12 @@ done
 # --- Feed Configuration ---
 while true; do
 	echo ""
-	echo "=== Feed Configuration ==="
+	echo "============= Feed Configuration ==============="
 	echo "1. Add feed: custompackage"
 	echo "2. Add feed: php7"
 	echo "3. Add both feeds"
 	echo "4. Skip"
-        echo "================================================"
+	echo "================================================"
 	read -rp "Select option [1-4]: " FEED_OPTION
 	case "$FEED_OPTION" in
 		1)
@@ -170,10 +192,10 @@ done
 # --- Feeds Update ---
 while true; do
 	echo ""
-	echo "=== Feed Update ==="
+	echo "================ Feed Update ==================="
 	echo "1. Run 'feeds update' and 'feeds install'"
 	echo "2. Skip"
-        echo "================================================"
+	echo "================================================"
 	read -rp "Select option [1-2]: " FEED_UPDATE
 	case "$FEED_UPDATE" in
 		1)
@@ -193,11 +215,11 @@ done
 # --- Build Menu ---
 while true; do
 	echo ""
-	echo "=== Build Menu ==="
+	echo "================== Build Menu =================="
 	echo "1. Run 'make menuconfig'"
 	echo "2. Start build immediately"
 	echo "3. Exit"
-        echo "================================================"
+	echo "================================================"
 	read -rp "Select option [1-3]: " BUILD_CHOICE
 	case "$BUILD_CHOICE" in
 		1)
