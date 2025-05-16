@@ -1,6 +1,6 @@
 #!/bin/bash
 #--------------------------------------------------------
-# OpenWrt Rebuild Script - Technical Style with Folder Selection
+# LEDE Autobuild Script - Technical Style with Git Checkout & Preset
 # Author: Pakalolo Waraso
 #--------------------------------------------------------
 
@@ -10,7 +10,6 @@ YELLOW='\033[1;33m'
 RED='\033[1;31m'
 NC='\033[0m'
 
-# === Utility: Format durasi dalam hh:mm:ss ===
 format_duration() {
 	local T=$1
 	printf '%02d:%02d:%02d\n' $((T/3600)) $((T%3600/60)) $((T%60))
@@ -25,7 +24,6 @@ echo "=================================="
 
 set -e
 
-# Pilihan Build Mode: Fresh atau Rebuild
 while true; do
 	echo ""
 	echo "========== Build Mode =========="
@@ -37,20 +35,30 @@ while true; do
 
 	case "$BUILD_MODE" in
 		1)
-			if [ -d lede ]; then
-				echo "[INFO] Removing existing 'lede' folder for fresh build..."
-				rm -rf lede
-			fi
+			[ -d lede ] && echo "[INFO] Removing existing 'lede' folder for fresh build..." && rm -rf lede
 			echo "[TASK] Cloning LEDE source repository..."
 			git clone https://github.com/coolsnowwolf/lede.git
 			cd lede
+
+			# Pilih tag atau branch
+			echo ""
+			echo "========== Git Branch/Tag =========="
+			read -rp "Enter Git branch or tag to checkout (leave blank to skip): " GIT_REF
+			if [ -n "$GIT_REF" ]; then
+				echo "[TASK] Checking out to '$GIT_REF'..."
+				git fetch --all
+				git checkout "$GIT_REF" || {
+					echo -e "${RED}[ERROR] Failed to checkout to $GIT_REF.${NC}"
+					exit 1
+				}
+			else
+				echo "[INFO] Skipping git checkout. Using default branch."
+			fi
+
 			break
 			;;
 		2)
-			if [ ! -d lede ]; then
-				echo -e "${RED}[ERROR] Folder 'lede' tidak ditemukan. Tidak bisa rebuild.${NC}"
-				exit 1
-			fi
+			[ ! -d lede ] && echo -e "${RED}[ERROR] Folder 'lede' tidak ditemukan. Tidak bisa rebuild.${NC}" && exit 1
 			echo "[INFO] Using existing 'lede' folder for rebuild..."
 			cd lede
 			break
@@ -68,6 +76,31 @@ done
 echo "[TASK] Applying NAND support patch..."
 cp target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch \
    target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch || true
+
+# Preset Config Menu
+while true; do
+	echo ""
+	echo "========== Preset Configuration =========="
+	echo "1. Use preset from github.com/BootLoopLover/preset-lede"
+	echo "2. Skip preset (manual config)"
+	echo "=========================================="
+	read -rp "Select option [1-2]: " PRESET_CHOICE
+
+	case "$PRESET_CHOICE" in
+		1)
+			echo "[TASK] Downloading preset config..."
+			wget -O .config https://raw.githubusercontent.com/BootLoopLover/preset-lede/main/config
+			break
+			;;
+		2)
+			echo "[INFO] Skipping preset config."
+			break
+			;;
+		*)
+			echo "[ERROR] Invalid input. Please enter 1 or 2."
+			;;
+	esac
+done
 
 # Feed configuration menu
 while true; do
@@ -135,51 +168,6 @@ while true; do
 	esac
 done
 
-# Preset menu
-while true; do
-	echo ""
-	echo "========== Preset Configuration =========="
-	echo "1. Skip preset"
-	echo "2. Use preset-lede (https://github.com/BootLoopLover/preset-lede)"
-	echo "=========================================="
-	read -rp "Select option [1-2]: " PRESET_CHOICE
-
-	case "$PRESET_CHOICE" in
-		1)
-			echo "[INFO] Skipping preset configuration."
-			break
-			;;
-		2)
-			echo "[TASK] Cloning preset-lede repository..."
-			cd .. || exit 1
-			if [ -d preset-lede ]; then
-				echo "[INFO] Removing existing preset-lede folder..."
-				rm -rf preset-lede
-			fi
-			git clone https://github.com/BootLoopLover/preset-lede.git
-			cd lede || exit 1
-
-			if [ -f ../preset-lede/config ]; then
-				cp ../preset-lede/config .config
-				echo "[INFO] .config from preset-lede applied."
-			else
-				echo "[WARN] No .config found in preset-lede."
-			fi
-
-			if [ -d ../preset-lede/files ]; then
-				mkdir -p files
-				cp -r ../preset-lede/files/* files/
-				echo "[INFO] Files from preset-lede copied to build."
-			fi
-
-			break
-			;;
-		*)
-			echo "[ERROR] Invalid input. Please select 1 or 2."
-			;;
-	esac
-done
-
 # Build menu
 while true; do
 	echo ""
@@ -195,12 +183,7 @@ while true; do
 			echo "[TASK] Starting build configuration (make menuconfig)..."
 			make menuconfig
 			read -rp "Proceed to build? [y/N]: " CONFIRM_BUILD
-			if [[ "$CONFIRM_BUILD" =~ ^[Yy]$ ]]; then
-				break
-			else
-				echo "[INFO] Build cancelled by user."
-				exit 0
-			fi
+			[[ "$CONFIRM_BUILD" =~ ^[Yy]$ ]] && break || { echo "[INFO] Build cancelled by user."; exit 0; }
 			;;
 		2)
 			break
@@ -215,7 +198,7 @@ while true; do
 	esac
 done
 
-# === Start Build with Retry on Failure ===
+# === Start Build ===
 echo "[TASK] Starting firmware build..."
 BUILD_START=$(date +%s)
 
@@ -229,6 +212,5 @@ fi
 
 BUILD_END=$(date +%s)
 BUILD_DURATION=$((BUILD_END - BUILD_START))
-
 echo ""
 echo -e "${GREEN}[DONE] Build completed in: $(format_duration $BUILD_DURATION)${NC}"
