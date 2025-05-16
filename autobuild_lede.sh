@@ -135,6 +135,51 @@ while true; do
 	esac
 done
 
+# Preset menu
+while true; do
+	echo ""
+	echo "========== Preset Configuration =========="
+	echo "1. Skip preset"
+	echo "2. Use preset-lede (https://github.com/BootLoopLover/preset-lede)"
+	echo "=========================================="
+	read -rp "Select option [1-2]: " PRESET_CHOICE
+
+	case "$PRESET_CHOICE" in
+		1)
+			echo "[INFO] Skipping preset configuration."
+			break
+			;;
+		2)
+			echo "[TASK] Cloning preset-lede repository..."
+			cd .. || exit 1
+			if [ -d preset-lede ]; then
+				echo "[INFO] Removing existing preset-lede folder..."
+				rm -rf preset-lede
+			fi
+			git clone https://github.com/BootLoopLover/preset-lede.git
+			cd lede || exit 1
+
+			if [ -f ../preset-lede/config ]; then
+				cp ../preset-lede/config .config
+				echo "[INFO] .config from preset-lede applied."
+			else
+				echo "[WARN] No .config found in preset-lede."
+			fi
+
+			if [ -d ../preset-lede/files ]; then
+				mkdir -p files
+				cp -r ../preset-lede/files/* files/
+				echo "[INFO] Files from preset-lede copied to build."
+			fi
+
+			break
+			;;
+		*)
+			echo "[ERROR] Invalid input. Please select 1 or 2."
+			;;
+	esac
+done
+
 # Build menu
 while true; do
 	echo ""
@@ -175,11 +220,11 @@ echo "[TASK] Starting firmware build..."
 BUILD_START=$(date +%s)
 
 if ! make -j$(nproc); then
-    echo -e "${YELLOW}[WARN] Initial build failed. Retrying with verbose output (make -j10 V=s)...${NC}"
-    if ! make -j10 V=s; then
-        echo -e "${RED}[ERROR] Build failed again with verbose output. Aborting.${NC}"
-        exit 1
-    fi
+	echo -e "${YELLOW}[WARN] Initial build failed. Retrying with verbose output (make -j10 V=s)...${NC}"
+	if ! make -j10 V=s; then
+		echo -e "${RED}[ERROR] Build failed again with verbose output. Aborting.${NC}"
+		exit 1
+	fi
 fi
 
 BUILD_END=$(date +%s)
