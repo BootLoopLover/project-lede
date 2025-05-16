@@ -20,6 +20,10 @@ echo "============== LEDE Firmware Autobuilder =============="
 echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
 echo -e "${BLUE}Maintainer: https://github.com/BootLoopLover${NC}"
 echo "======================================================="
+echo -e "${BLUE}Firmware Modification Project${NC}"
+echo -e "${BLUE}Author: Pakalolo Waraso${NC}"
+echo -e "${BLUE}Special Thanks: Awiks Telegram Group${NC}"
+echo "======================================================="
 
 set -e
 
