@@ -29,44 +29,6 @@ show_branding() {
     echo "======================================================="
 }
 
-# --- Fungsi pilih mode build ---
-select_build_mode() {
-    while true; do
-        echo ""
-        echo "============ Build Mode Selection =============="
-        echo "1. Fresh Build (clean and clone)"
-        echo "2. Rebuild (use existing 'lede' directory)"
-        echo "0. Exit"
-        echo "================================================"
-        read -rp "Select option [0-2]: " BUILD_MODE
-        case "$BUILD_MODE" in
-            1)
-                echo "[INFO] Starting fresh build..."
-                rm -rf lede
-                git clone https://github.com/coolsnowwolf/lede.git
-                cd lede
-                break
-                ;;
-            2)
-                if [ ! -d lede ]; then
-                    echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
-                    exit 1
-                fi
-                cd lede
-                echo "[INFO] Using existing 'lede' directory."
-                break
-                ;;
-            0)
-                echo "[INFO] Exiting script."
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid selection. Please enter a number between 0 and 2.${NC}"
-                ;;
-        esac
-    done
-}
-
 # --- Fungsi apply NAND patch ---
 apply_nand_patch() {
     echo -e "${BLUE}[TASK] Checking for NAND support patch...${NC}"
@@ -81,7 +43,7 @@ apply_nand_patch() {
     fi
 }
 
-# --- Fungsi update feeds ---
+# --- Fungsi update feeds (interaktif) ---
 update_feeds() {
     while true; do
         echo ""
@@ -189,31 +151,6 @@ feed_configuration() {
     done
 }
 
-# --- Fungsi update feeds ---
-update_feeds() {
-    while true; do
-        echo ""
-        echo "============= Feed Update ==================="
-        echo "1. Run 'feeds update' and 'feeds install'"
-        echo "2. Skip"
-        echo "=============================================="
-        read -rp "Select option [1-2]: " FEED_UPDATE
-        case "$FEED_UPDATE" in
-            1)
-                ./scripts/feeds update -a
-                ./scripts/feeds install -a
-                break
-                ;;
-            2)
-                break
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid selection.${NC}"
-                ;;
-        esac
-    done
-}
-
 # --- Fungsi checkout git tag ---
 select_git_tag() {
     while true; do
@@ -250,7 +187,6 @@ select_git_tag() {
         esac
     done
 }
-
 
 # --- Fungsi menu build ---
 build_menu() {
@@ -307,14 +243,55 @@ start_build() {
     echo -e "${GREEN}[SUCCESS] Build completed in: $(format_duration $BUILD_DURATION)${NC}"
 }
 
+# --- Fungsi pilih build mode (clone/rebuild + NAND patch + update feeds pertama) ---
+select_build_mode() {
+    while true; do
+        echo ""
+        echo "============ Build Mode Selection =============="
+        echo "1. Fresh Build (clean and clone)"
+        echo "2. Rebuild (use existing 'lede' directory)"
+        echo "0. Exit"
+        echo "================================================"
+        read -rp "Select option [0-2]: " BUILD_MODE
+        case "$BUILD_MODE" in
+            1)
+                echo "[INFO] Starting fresh build..."
+                rm -rf lede
+                git clone https://github.com/coolsnowwolf/lede.git
+                cd lede
+                apply_nand_patch
+                update_feeds       # <-- update feeds pertama setelah clone dan patch
+                break
+                ;;
+            2)
+                if [ ! -d lede ]; then
+                    echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
+                    exit 1
+                fi
+                cd lede
+                echo "[INFO] Using existing 'lede' directory."
+                apply_nand_patch
+                update_feeds       # <-- update feeds pertama juga untuk rebuild
+                break
+                ;;
+            0)
+                echo "[INFO] Exiting script."
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid selection. Please enter a number between 0 and 2.${NC}"
+                ;;
+        esac
+    done
+}
+
 # === MAIN SCRIPT EXECUTION ===
 
 show_branding
 select_build_mode
 select_git_tag
-apply_nand_patch
 preset_configuration
 feed_configuration
-update_feeds
+update_feeds     # update feeds kedua (optional setelah tambah feed)
 build_menu
 start_build
