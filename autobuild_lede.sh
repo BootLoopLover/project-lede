@@ -112,10 +112,10 @@ clone_and_copy_preset() {
         cp -r "../$folder_name/files/"* files/
     fi
 
-    if [ -f "../$folder_name/config-nss" ]; then
-        cp "../$folder_name/config-nss" .config
+    if [ -f "../$folder_name/config-preset" ]; then
+        cp "../$folder_name/config-preset" .config
         skip_menuconfig=true
-        echo "[INFO] Applied preset: config-nss. Skipping menuconfig."
+        echo "[INFO] Applied preset: config-preset. Skipping menuconfig."
     else
         echo -e "${YELLOW}[WARNING] No preset config file found in ${folder_name}. Continuing with menuconfig.${NC}"
         skip_menuconfig=false
@@ -131,7 +131,7 @@ read -rp "Select option [1-2]: " PRESET_OPTION
 
 case "$PRESET_OPTION" in
     1)
-        clone_and_copy_preset "https://github.com/BootLoopLover/preset-openwrt.git" "preset-lede"
+        clone_and_copy_preset "https://github.com/BootLoopLover/preset-lede.git" "preset-lede"
         ;;
     2)
         echo "[INFO] Preset selection skipped."
