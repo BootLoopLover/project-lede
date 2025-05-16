@@ -61,6 +61,10 @@ while true; do
     esac
 done
 
+echo "[TASK] Applying NAND support patch..."
+cp target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch \
+target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch || true
+
 # --- Git Tag Selection ---
 while true; do
     echo ""
