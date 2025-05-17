@@ -119,15 +119,43 @@ apply_nand_patch() {
 
 # ─── Preset Konfigurasi ─────────────────────────────────
 preset_configuration() {
-    read -p "Gunakan preset config dari GitHub? (y/n): " USE_PRESET
-    if [[ "$USE_PRESET" =~ ^[Yy]$ ]]; then
-        read -p "Masukkan URL preset repo: " PRESET_REPO
-        git clone "$PRESET_REPO" ../preset-temp
-        [[ -d ../preset-temp/files ]] && cp -rf ../preset-temp/files ./files
-        [[ -f ../preset-temp/.config ]] && cp -f ../preset-temp/.config .config
-        rm -rf ../preset-temp
-    fi
+    echo ""
+    echo "=========== Preset Konfigurasi ==========="
+    echo "1. Gunakan preset dari BootLoopLover (project-lede)"
+    echo "2. Masukkan URL preset manual"
+    echo "3. Lewati preset"
+    echo "=========================================="
+    read -p "Pilih (1/2/3): " PRESET_OPT
+
+    case "$PRESET_OPT" in
+        1)
+            PRESET_REPO="https://github.com/BootLoopLover/project-lede.git"
+            ;;
+        2)
+            read -p "Masukkan URL preset repo: " PRESET_REPO
+            ;;
+        3)
+            echo -e "${YELLOW}[*] Melewati penggunaan preset.${NC}"
+            return
+            ;;
+        *)
+            echo -e "${RED}Pilihan tidak valid.${NC}"
+            preset_configuration  # ulangi jika salah input
+            return
+            ;;
+    esac
+
+    echo -e "${YELLOW}[*] Mengambil preset dari: $PRESET_REPO${NC}"
+    git clone "$PRESET_REPO" ../preset-temp || {
+        echo -e "${RED}[ERROR] Gagal clone preset repo.${NC}"
+        return
+    }
+    [[ -d ../preset-temp/files ]] && cp -rf ../preset-temp/files ./files
+    [[ -f ../preset-temp/.config ]] && cp -f ../preset-temp/.config .config
+    rm -rf ../preset-temp
+    echo -e "${GREEN}[✔] Preset berhasil diterapkan.${NC}"
 }
+
 
 # ─── Konfigurasi Feed ───────────────────────────────────
 feed_configuration() {
