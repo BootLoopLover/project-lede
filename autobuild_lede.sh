@@ -32,16 +32,42 @@ show_branding() {
 # --- Fungsi update dependencies (opsional) ---
 update_dependencies() {
     echo -e "${BLUE}[TASK] Updating build dependencies...${NC}"
-    sudo apt update -y
-    sudo apt full-upgrade -y
+
+    # Update dan upgrade sistem dengan output terlihat
+    sudo apt update -y 2>&1 | tee /dev/tty
+    sudo apt full-upgrade -y 2>&1 | tee /dev/tty
+
+    # Install dependencies
     sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
         bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext \
         genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev \
         libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev \
         libreadline-dev libssl-dev libtool llvm lrzsz msmtp ninja-build p7zip p7zip-full patch pkgconf \
         python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion \
-        swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev 2>&1 | tee /dev/tty
 }
+
+# --- Fungsi tanya apakah ingin update dependencies ---
+ask_update_dependencies() {
+    echo ""
+    echo "========== Dependencies Setup =========="
+    echo "1. Update build dependencies (recommended)"
+    echo "2. Skip"
+    echo "========================================"
+    read -rp "Select option [1-2]: " DEP_OPTION
+    case "$DEP_OPTION" in
+        1)
+            update_dependencies
+            ;;
+        2)
+            echo "[INFO] Skipping dependency update."
+            ;;
+        *)
+            echo -e "${YELLOW}[WARNING] Invalid input. Skipping dependency update.${NC}"
+            ;;
+    esac
+}
+
 
 # --- Fungsi pilih mode build ---
 select_build_mode() {
