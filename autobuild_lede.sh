@@ -191,28 +191,47 @@ feed_configuration() {
     done
 }
 
-# ─── Update Feed ────────────────────────────────────────
-update_feeds() {
-    echo -e "${YELLOW}[*] Update & install feeds...${NC}"
-    ./scripts/feeds update -a
-    ./scripts/feeds install -a
-}
+# ─── Menu Update Feed & Build (Loop) ───────────────────────
+feeds_and_build_menu() {
+    while true; do
+        echo ""
+        echo "========= Menu Update & Build ========="
+        echo "1. Update & install feeds + jalankan menuconfig"
+        echo "2. Jalankan 'make menuconfig' saja"
+        echo "3. Mulai build firmware"
+        echo "4. Keluar"
+        echo "======================================="
+        read -p "Pilih (1/2/3/4): " MENU_OPT
 
-# ─── Menu Build ─────────────────────────────────────────
-build_menu() {
-    echo ""
-    echo "============= Build Menu =============="
-    echo "1. Jalankan 'make menuconfig'"
-    echo "2. Langsung mulai build"
-    echo "3. Keluar"
-    echo "======================================="
-    read -p "Pilih (1/2/3): " BACT
-    case "$BACT" in
-        1) make menuconfig ;;
-        2) ;;
-        3) echo -e "${YELLOW}Keluar...${NC}"; exit 0 ;;
-        *) echo -e "${RED}Pilihan tidak valid.${NC}" ;;
-    esac
+        case "$MENU_OPT" in
+            1)
+                echo -e "${YELLOW}[*] Update & install feeds...${NC}"
+                ./scripts/feeds update -a
+                ./scripts/feeds install -a
+                echo -e "${CYAN}[*] Menjalankan menuconfig...${NC}"
+                make menuconfig
+                ;;
+            2)
+                make menuconfig
+                ;;
+            3)
+                echo -e "${CYAN}[*] Memulai proses build...${NC}"
+                if ! make -j"$(nproc)"; then
+                    echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
+                    make V=s
+                fi
+                END_TIME=$(date +%s)
+                echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
+                ;;
+            4)
+                echo -e "${YELLOW}Keluar...${NC}"
+                break
+                ;;
+            *)
+                echo -e "${RED}Pilihan tidak valid.${NC}"
+                ;;
+        esac
+    done
 }
 
 # ─── Build Firmware ─────────────────────────────────────
@@ -239,8 +258,7 @@ main() {
     apply_nand_patch
     preset_configuration
     feed_configuration
-    update_feeds
-    build_menu
+    feeds_and_build_menu
     start_build
 }
 
