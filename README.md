@@ -8,5 +8,7 @@ wget https://raw.githubusercontent.com/BootLoopLover/project-lede/main/autobuild
 
 ![Image](https://github.com/user-attachments/assets/52eb2851-77d2-4191-9df5-c194b69480e7)
 
+![Image](https://github.com/user-attachments/assets/972d46b9-5cdc-4a08-b747-931096ebfeb8)
+
 
 
