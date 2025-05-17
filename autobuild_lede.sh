@@ -129,7 +129,7 @@ preset_configuration() {
 
     case "$PRESET_OPT" in
         1)
-            PRESET_REPO="https://github.com/BootLoopLover/project-lede.git"
+            PRESET_REPO="https://github.com/BootLoopLover/preset-lede.git"
             ;;
         2)
             read -p "Masukkan URL preset repo: " PRESET_REPO
