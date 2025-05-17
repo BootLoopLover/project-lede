@@ -132,24 +132,29 @@ preset_configuration() {
 # ─── Konfigurasi Feed ──────────────────────────────────────────────
 feed_configuration() {
     echo -e "${YELLOW}[*] Menambahkan feed tambahan...${NC}"
-    
-    # Tambahkan feed custompackage selalu
-    echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
-    echo 'src-git custompackage https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+
+    # Tambahkan feed custom-package (utama)
+    if ! grep -q "src-git custompackage " feeds.conf.default; then
+        echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
+    fi
+
+    # Tambahkan feed php7-package (dengan nama berbeda)
+    if ! grep -q "src-git php7package " feeds.conf.default; then
+        echo 'src-git php7package https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+    fi
 
     while true; do
         echo ""
         echo "=========== Feed Tambahan ==========="
         echo "1. Tambahkan feed custom manual"
-        echo "2. Skip"
+        echo "2. Lewati"
         echo "====================================="
-        read -p "Pilih (1/2/3): " FEED_OPT
+        read -p "Pilih (1/2): " FEED_OPT
         case "$FEED_OPT" in
             1)
                 read -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
                 echo "$LINE" >> feeds.conf.default
                 ;;
-                
             2)
                 break
                 ;;
@@ -160,14 +165,6 @@ feed_configuration() {
     done
 }
 
-# ─── Update & Install Feed ──────────────────────────────
-update_feeds() {
-    read -p "Update dan install feeds? (y/n): " FEEDS
-    if [[ "$FEEDS" =~ ^[Yy]$ ]]; then
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
-    fi
-}
 
 # ─── Menu Build ─────────────────────────────────────────
 build_menu() {
