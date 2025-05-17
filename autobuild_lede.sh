@@ -29,6 +29,44 @@ show_branding() {
     echo "======================================================="
 }
 
+# --- Fungsi pilih mode build ---
+select_build_mode() {
+    while true; do
+        echo ""
+        echo "============ Build Mode Selection =============="
+        echo "1. Fresh Build (clean and clone)"
+        echo "2. Rebuild (use existing 'lede' directory)"
+        echo "0. Exit"
+        echo "================================================"
+        read -rp "Select option [0-2]: " BUILD_MODE
+        case "$BUILD_MODE" in
+            1)
+                echo "[INFO] Starting fresh build..."
+                rm -rf lede
+                git clone https://github.com/coolsnowwolf/lede.git
+                cd lede || exit
+                break
+                ;;
+            2)
+                if [ ! -d lede ]; then
+                    echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
+                    exit 1
+                fi
+                cd lede || exit
+                echo "[INFO] Using existing 'lede' directory."
+                break
+                ;;
+            0)
+                echo "[INFO] Exiting script."
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}[ERROR] Invalid selection. Please enter a number between 0 and 2.${NC}"
+                ;;
+        esac
+    done
+}
+
 # --- Fungsi update dependencies (opsional) ---
 update_dependencies() {
     echo -e "${BLUE}[TASK] Updating build dependencies...${NC}"
@@ -66,45 +104,6 @@ ask_update_dependencies() {
             echo -e "${YELLOW}[WARNING] Invalid input. Skipping dependency update.${NC}"
             ;;
     esac
-}
-
-
-# --- Fungsi pilih mode build ---
-select_build_mode() {
-    while true; do
-        echo ""
-        echo "============ Build Mode Selection =============="
-        echo "1. Fresh Build (clean and clone)"
-        echo "2. Rebuild (use existing 'lede' directory)"
-        echo "0. Exit"
-        echo "================================================"
-        read -rp "Select option [0-2]: " BUILD_MODE
-        case "$BUILD_MODE" in
-            1)
-                echo "[INFO] Starting fresh build..."
-                rm -rf lede
-                git clone https://github.com/coolsnowwolf/lede.git
-                cd lede || exit
-                break
-                ;;
-            2)
-                if [ ! -d lede ]; then
-                    echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
-                    exit 1
-                fi
-                cd lede || exit
-                echo "[INFO] Using existing 'lede' directory."
-                break
-                ;;
-            0)
-                echo "[INFO] Exiting script."
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid selection. Please enter a number between 0 and 2.${NC}"
-                ;;
-        esac
-    done
 }
 
 # --- Fungsi checkout git tag ---
