@@ -2,7 +2,7 @@
 ```
 wget https://raw.githubusercontent.com/BootLoopLover/project-lede/main/autobuild_lede.sh && chmod +x autobuild_lede.sh && ./autobuild_lede.sh
 ```
-
+------
 
 ![Image](https://github.com/user-attachments/assets/b493a374-c244-4bab-bd05-4f6b1b8d86e8)
 
