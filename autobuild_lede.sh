@@ -1,4 +1,8 @@
 #!/bin/bash
+#--------------------------------------------------------
+# LEDE Firmware Autobuild Script
+# Author: Pakalolo Waraso
+#--------------------------------------------------------
 set -e
 
 # Warna
@@ -17,6 +21,13 @@ show_branding() {
     echo "╔══════════════════════════════════════╗"
     echo "║    AUTO BUILD LEDE / OPENWRT SCRIPT  ║"
     echo "╚══════════════════════════════════════╝"
+    echo "============== LEDE Firmware Autobuilder =============="
+    echo -e "${BLUE}Firmware Modification Project${NC}"
+    echo -e "${BLUE}Author: Pakalolo Waraso${NC}"
+    echo -e "${BLUE}Special Thanks: Awiks Telegram Group${NC}"
+    echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
+    echo -e "${BLUE}Maintainer: https://github.com/BootLoopLover${NC}"
+    echo "======================================================="
     echo -e "${NC}"
 }
 
@@ -43,11 +54,15 @@ install_dependencies() {
     echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
 }
 
-# ─── Pilih Mode Build ─────────────────────────────────────────────
+# --- Fungsi pilih mode build ---
 select_build_mode() {
-    echo -e "${YELLOW}Pilih Mode Build:${NC}"
-    echo "1) Fresh Build (clone baru)"
-    echo "2) Rebuild (lanjutkan dari folder lede/)"
+    while true; do
+        echo ""
+        echo "============ Build Mode Selection =============="
+        echo "1. Fresh Build (clean and clone)"
+        echo "2. Rebuild (use existing 'lede' directory)"
+        echo "0. Exit"
+        echo "================================================"
     read -p "Pilih (1/2): " mode
 
     if [[ "$mode" == "1" ]]; then
@@ -125,9 +140,11 @@ update_feeds() {
 
 # ─── Menu Build ───────────────────────────────────────────────────
 build_menu() {
-    echo -e "${YELLOW}Pilih Aksi Build:${NC}"
-    echo "1) Buka menuconfig"
-    echo "2) Langsung build"
+        echo "============= Build Menu =============="
+        echo "1. Run 'make menuconfig'"
+        echo "2. Start build immediately"
+        echo "3. Exit"
+        echo "======================================="
     read -p "Pilih (1/2): " BACT
 
     if [[ "$BACT" == "1" ]]; then
