@@ -1,330 +1,169 @@
 #!/bin/bash
-#--------------------------------------------------------
-# LEDE Firmware Autobuild Script
-# Author: Pakalolo Waraso
-#--------------------------------------------------------
+set -e
 
-# === Warna untuk output terminal ===
-BLUE='\033[1;34m'
-GREEN='\033[1;32m'
+# Warna
+RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-RED='\033[1;31m'
+CYAN='\033[1;36m'
 NC='\033[0m'
 
-# --- Fungsi format durasi (detik ke hh:mm:ss) ---
-format_duration() {
-    local T=$1
-    printf '%02d:%02d:%02d\n' $((T/3600)) $((T%3600/60)) $((T%60))
-}
+LEDE_DIR="lede"
+START_TIME=$(date +%s)
 
-# --- Fungsi tampilkan branding ---
+# ─── Branding ─────────────────────────────────────────────────────
 show_branding() {
-    clear
-    echo "============== LEDE Firmware Autobuilder =============="
-    echo -e "${BLUE}Firmware Modification Project${NC}"
-    echo -e "${BLUE}Author: Pakalolo Waraso${NC}"
-    echo -e "${BLUE}Special Thanks: Awiks Telegram Group${NC}"
-    echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
-    echo -e "${BLUE}Maintainer: https://github.com/BootLoopLover${NC}"
-    echo "======================================================="
+    echo -e "${CYAN}"
+    echo "╔══════════════════════════════════════╗"
+    echo "║    AUTO BUILD LEDE / OPENWRT SCRIPT  ║"
+    echo "╚══════════════════════════════════════╝"
+    echo -e "${NC}"
 }
 
-# --- Fungsi pilih mode build ---
+# ─── Install Dependencies ─────────────────────────────────────────
+install_dependencies() {
+    if ! grep -qEi 'ubuntu|debian' /etc/*release; then
+        echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
+
+    sudo apt-get update
+
+    sudo apt-get install -y \
+        build-essential flex bison g++ gawk gcc gettext git \
+        libncurses5-dev libz-dev patch python3 python3-distutils \
+        rsync subversion unzip zlib1g-dev file wget libssl-dev \
+        ccache xsltproc libxml-parser-perl ecj fastjar \
+        java-propose-classpath libglib2.0-dev libfuse-dev \
+        clang lld llvm libelf-dev device-tree-compiler \
+        bc u-boot-tools qemu-utils asciidoc sudo time
+
+    echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
+}
+
+# ─── Pilih Mode Build ─────────────────────────────────────────────
 select_build_mode() {
-    while true; do
-        echo ""
-        echo "============ Build Mode Selection =============="
-        echo "1. Fresh Build (clean and clone)"
-        echo "2. Rebuild (use existing 'lede' directory)"
-        echo "0. Exit"
-        echo "================================================"
-        read -rp "Select option [0-2]: " BUILD_MODE
-        case "$BUILD_MODE" in
-            1)
-                echo "[INFO] Starting fresh build..."
-                rm -rf lede
-                git clone https://github.com/coolsnowwolf/lede.git
-                cd lede || exit
-                break
-                ;;
-            2)
-                if [ ! -d lede ]; then
-                    echo -e "${RED}[ERROR] Directory 'lede' not found. Cannot proceed with rebuild.${NC}"
-                    exit 1
-                fi
-                cd lede || exit
-                echo "[INFO] Using existing 'lede' directory."
-                break
-                ;;
-            0)
-                echo "[INFO] Exiting script."
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid selection. Please enter a number between 0 and 2.${NC}"
-                ;;
-        esac
-    done
+    echo -e "${YELLOW}Pilih Mode Build:${NC}"
+    echo "1) Fresh Build (clone baru)"
+    echo "2) Rebuild (lanjutkan dari folder lede/)"
+    read -p "Pilih (1/2): " mode
+
+    if [[ "$mode" == "1" ]]; then
+        read -p "Masukkan URL repo LEDE (default: https://github.com/coolsnowwolf/lede): " REPO
+        REPO=${REPO:-https://github.com/coolsnowwolf/lede}
+        rm -rf "$LEDE_DIR"
+        git clone "$REPO" "$LEDE_DIR"
+    elif [[ "$mode" != "2" ]]; then
+        echo -e "${RED}Pilihan tidak valid.${NC}"
+        exit 1
+    fi
 }
 
-# --- Fungsi update dependencies (opsional) ---
-update_dependencies() {
-    echo -e "${BLUE}[TASK] Updating build dependencies...${NC}"
-
-    # Update dan upgrade sistem dengan output terlihat
-    sudo apt update -y 2>&1 | tee /dev/tty
-    sudo apt full-upgrade -y 2>&1 | tee /dev/tty
-
-    # Install dependencies
-    sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-        bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gcc-multilib g++-multilib gettext \
-        genisoimage git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev \
-        libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev \
-        libreadline-dev libssl-dev libtool llvm lrzsz msmtp ninja-build p7zip p7zip-full patch pkgconf \
-        python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion \
-        swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev 2>&1 | tee /dev/tty
+# ─── Masuk Folder LEDE ────────────────────────────────────────────
+run_in_lede_dir() {
+    cd "$LEDE_DIR" || {
+        echo -e "${RED}[ERROR] Gagal masuk folder $LEDE_DIR${NC}"
+        exit 1
+    }
 }
 
-# --- Fungsi tanya apakah ingin update dependencies ---
-ask_update_dependencies() {
-    echo ""
-    echo "========== Dependencies Setup =========="
-    echo "1. Update build dependencies (recommended)"
-    echo "2. Skip"
-    echo "========================================"
-    read -rp "Select option [1-2]: " DEP_OPTION
-    case "$DEP_OPTION" in
-        1)
-            update_dependencies
-            ;;
-        2)
-            echo "[INFO] Skipping dependency update."
-            ;;
-        *)
-            echo -e "${YELLOW}[WARNING] Invalid input. Skipping dependency update.${NC}"
-            ;;
-    esac
-}
-
-# --- Fungsi checkout git tag ---
+# ─── Pilih Tag Git ────────────────────────────────────────────────
 select_git_tag() {
-    while true; do
-        echo ""
-        echo "========== Git Tag Checkout (Optional) ========"
-        echo "1. List and checkout available tags"
-        echo "2. Skip"
-        echo "================================================"
-        read -rp "Select option [1-2]: " TAG_OPTION
-        case "$TAG_OPTION" in
-            1)
-                TAGS=$(git tag)
-                if [ -z "$TAGS" ]; then
-                    echo "[INFO] No Git tags found in repository."
-                    break
-                fi
-                echo "[AVAILABLE TAGS]"
-                select tag in $TAGS; do
-                    if [ -n "$tag" ]; then
-                        git checkout "$tag" || {
-                            echo -e "${RED}[ERROR] Failed to checkout tag $tag. Aborting.${NC}"
-                            exit 1
-                        }
-                        echo -e "${GREEN}[INFO] Checked out tag: $tag${NC}"
-                        break 2
-                    else
-                        echo -e "${RED}[ERROR] Invalid selection.${NC}"
-                    fi
-                done
-                ;;
-            2)
-                break
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid input. Please select 1 or 2.${NC}"
-                ;;
-        esac
-    done
+    echo -e "${YELLOW}[*] Memilih git tag (opsional)...${NC}"
+    git fetch --tags
+    TAGS=$(git tag -l)
+    echo "$TAGS"
+    read -p "Masukkan tag git (atau kosongkan untuk skip): " TAG
+    if [[ -n "$TAG" ]]; then
+        git checkout "$TAG"
+    fi
 }
 
-# --- Fungsi apply NAND patch ---
+# ─── Patch NAND (Opsional) ────────────────────────────────────────
 apply_nand_patch() {
-    echo -e "${BLUE}[TASK] Checking for NAND support patch...${NC}"
-    PATCH_SRC="target/linux/qualcommax/patches-6.6/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
-    PATCH_DST="target/linux/qualcommax/patches-6.1/0400-mtd-rawnand-add-support-for-TH58NYG3S0HBAI4.patch"
-
-    if [ -f "$PATCH_SRC" ]; then
-        if [ ! -f "$PATCH_DST" ]; then
-            cp "$PATCH_SRC" "$PATCH_DST"
-            echo -e "${GREEN}[INFO] NAND patch copied successfully.${NC}"
-        else
-            echo -e "${YELLOW}[INFO] NAND patch already exists. Skipping copy.${NC}"
-        fi
-    else
-        echo -e "${YELLOW}[INFO] NAND patch not found at ${PATCH_SRC}. Skipping.${NC}"
+    if [[ -d "../patch-nand" ]]; then
+        echo -e "${YELLOW}[*] Menerapkan patch NAND...${NC}"
+        cp -rf ../patch-nand/* target/linux/
     fi
 }
 
-# --- Fungsi konfigurasi preset ---
+# ─── Preset Config ────────────────────────────────────────────────
 preset_configuration() {
-    echo ""
-    echo "============ Preset Configuration ============="
-    echo "1. Clone and use preset from 'preset-lede' repo"
-    echo "2. Skip"
-    echo "==============================================="
-    read -rp "Select option [1-2]: " PRESET_OPTION
-
-    case "$PRESET_OPTION" in
-        1)
-            echo -e "${BLUE}Cloning preset-lede...${NC}"
-            git clone https://github.com/BootLoopLover/preset-lede.git ../preset-lede || {
-                echo -e "${RED}Failed to clone preset repo.${NC}"
-                return
-            }
-            if [ -d ../preset-lede/files ]; then
-                echo "[INFO] Copying 'files' directory..."
-                mkdir -p files
-                cp -r ../preset-lede/files/* files/
-            fi
-            if [ -f ../preset-lede/config-preset ]; then
-                cp ../preset-lede/config-preset .config
-                skip_menuconfig=true
-                echo -e "${GREEN}[INFO] Applied preset: config-preset. Skipping menuconfig.${NC}"
-            else
-                echo -e "${YELLOW}[WARNING] Preset config not found. Will open menuconfig.${NC}"
-                skip_menuconfig=false
-            fi
-            ;;
-        2)
-            echo "[INFO] Preset selection skipped."
-            ;;
-        *)
-            echo -e "${RED}[ERROR] Invalid input. Proceeding without preset.${NC}"
-            ;;
-    esac
+    read -p "Gunakan preset config dari GitHub? (y/n): " USE_PRESET
+    if [[ "$USE_PRESET" =~ ^[Yy]$ ]]; then
+        read -p "Masukkan URL preset repo: " PRESET_REPO
+        git clone "$PRESET_REPO" ../preset-temp
+        cp -rf ../preset-temp/files ./files 2>/dev/null || true
+        cp -f ../preset-temp/.config .config 2>/dev/null || true
+        rm -rf ../preset-temp
+    fi
 }
 
-# --- Fungsi konfigurasi feeds ---
+# ─── Feed Custom ──────────────────────────────────────────────────
 feed_configuration() {
-    while true; do
-        echo ""
-        echo "=========== Feed Configuration ==========="
-        echo "1. Add feed: custompackage"
-        echo "2. Add feed: php7"
-        echo "3. Add both feeds"
-        echo "4. Skip"
-        echo "==========================================="
-        read -rp "Select option [1-4]: " FEED_OPTION
-        case "$FEED_OPTION" in
-            1)
-                echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
-                break
-                ;;
-            2)
-                echo 'src-git php7 https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
-                break
-                ;;
-            3)
-                echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
-                echo 'src-git php7 https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
-                break
-                ;;
-            4)
-                break
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid selection.${NC}"
-                ;;
-        esac
-    done
+    read -p "Tambahkan feed custom? (y/n): " FEED_CUSTOM
+    if [[ "$FEED_CUSTOM" =~ ^[Yy]$ ]]; then
+        read -p "Masukkan baris feed misal: src-git custom https://github.com/xxx.git: " LINE
+        echo "$LINE" >> feeds.conf.default
+    fi
+    read -p "Tambahkan feed PHP7 dari OpenWrt 22.03? (y/n): " FEED_PHP
+    if [[ "$FEED_PHP" =~ ^[Yy]$ ]]; then
+        echo "src-git php7 https://github.com/openwrt/packages;openwrt-22.03" >> feeds.conf.default
+    fi
 }
 
-# --- Fungsi update feeds ---
+# ─── Update Feed ──────────────────────────────────────────────────
 update_feeds() {
-    while true; do
-        echo ""
-        echo "============= Feed Update ==================="
-        echo "1. Run 'feeds update' and 'feeds install'"
-        echo "2. Skip"
-        echo "=============================================="
-        read -rp "Select option [1-2]: " FEED_UPDATE
-        case "$FEED_UPDATE" in
-            1)
-                ./scripts/feeds update -a && ./scripts/feeds install -a
-                break
-                ;;
-            2)
-                break
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid selection.${NC}"
-                ;;
-        esac
-    done
+    read -p "Update dan install feeds? (y/n): " FEEDS
+    if [[ "$FEEDS" =~ ^[Yy]$ ]]; then
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+    fi
 }
 
-# --- Fungsi menu build ---
+# ─── Menu Build ───────────────────────────────────────────────────
 build_menu() {
-    while true; do
-        echo ""
-        echo "============= Build Menu =============="
-        echo "1. Run 'make menuconfig'"
-        echo "2. Start build immediately"
-        echo "3. Exit"
-        echo "======================================="
-        if [ "$skip_menuconfig" = true ]; then
-            echo -e "${YELLOW}[INFO] Skipping menuconfig as preset config has been applied.${NC}"
-            break
-        fi
-        read -rp "Select option [1-3]: " BUILD_CHOICE
-        case "$BUILD_CHOICE" in
-            1)
-                make menuconfig
-                read -rp "Proceed to build? [y/N]: " CONFIRM
-                [[ "$CONFIRM" =~ ^[Yy]$ ]] && break || exit 0
-                ;;
-            2)
-                break
-                ;;
-            3)
-                exit 0
-                ;;
-            *)
-                echo -e "${RED}[ERROR] Invalid input.${NC}"
-                ;;
-        esac
-    done
+    echo -e "${YELLOW}Pilih Aksi Build:${NC}"
+    echo "1) Buka menuconfig"
+    echo "2) Langsung build"
+    read -p "Pilih (1/2): " BACT
+
+    if [[ "$BACT" == "1" ]]; then
+        make menuconfig
+    fi
 }
 
-# --- Fungsi proses build ---
+# ─── Mulai Build ──────────────────────────────────────────────────
 start_build() {
-    echo "[TASK] Starting build process..."
-    local BUILD_START
-    local BUILD_END
-    local BUILD_DURATION
+    echo -e "${CYAN}[*] Memulai build...${NC}"
+    make -j"$(nproc)" || make V=s
+    END_TIME=$(date +%s)
+    BUILD_DURATION=$((END_TIME - START_TIME))
+    echo -e "${GREEN}[✔] Build selesai dalam $BUILD_DURATION detik.${NC}"
+}
 
-    BUILD_START=$(date +%s)
+# ─── Main ─────────────────────────────────────────────────────────
+main() {
+    show_branding
 
-    if ! make -j"$(nproc)"; then
-        echo -e "${YELLOW}[WARNING] Build failed. Retrying with verbose output...${NC}"
-        if ! make -j"$(nproc)" V=s; then
-            echo -e "${RED}[ERROR] Build failed again. Aborting.${NC}"
-            exit 1
-        fi
+    read -p "Install build dependencies? (y/n): " INSTALL_DEPS
+    if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
+        install_dependencies
+    else
+        echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
     fi
 
-    BUILD_END=$(date +%s)
-    BUILD_DURATION=$((BUILD_END - BUILD_START))
-    echo -e "${GREEN}[SUCCESS] Build completed in: $(format_duration $BUILD_DURATION)${NC}"
+    select_build_mode
+    run_in_lede_dir
+    select_git_tag
+    apply_nand_patch
+    preset_configuration
+    feed_configuration
+    update_feeds
+    build_menu
+    start_build
 }
 
-# === MAIN SCRIPT EXECUTION ===
-
-show_branding
-select_build_mode
-select_git_tag
-apply_nand_patch
-preset_configuration
-feed_configuration
-update_feeds
-build_menu
-start_build
+main "$@"
