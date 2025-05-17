@@ -98,17 +98,6 @@ run_in_lede_dir() {
     }
 }
 
-# ─── Pilih Tag Git (Opsional) ───────────────────────────
-select_git_tag() {
-    echo -e "${YELLOW}[*] Menampilkan daftar tag git...${NC}"
-    git fetch --tags
-    git tag -l
-    read -p "Masukkan tag git untuk checkout (biarkan kosong untuk skip): " TAG
-    if [[ -n "$TAG" ]]; then
-        git checkout "$TAG"
-    fi
-}
-
 # ─── Patch NAND (Opsional) ──────────────────────────────
 apply_nand_patch() {
     if [[ -d "../patch-nand" ]]; then
@@ -254,7 +243,6 @@ main() {
 
     select_build_mode
     run_in_lede_dir
-    select_git_tag
     apply_nand_patch
     preset_configuration
     feed_configuration
