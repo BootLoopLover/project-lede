@@ -131,16 +131,32 @@ preset_configuration() {
 
 # ─── Konfigurasi Feed ───────────────────────────────────
 feed_configuration() {
-    read -p "Tambahkan feed custom? (y/n): " FEED_CUSTOM
-    if [[ "$FEED_CUSTOM" =~ ^[Yy]$ ]]; then
-        read -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
-        echo "$LINE" >> feeds.conf.default
-    fi
-    read -p "Tambahkan feed PHP7 dari OpenWrt 22.03? (y/n): " FEED_PHP
-    if [[ "$FEED_PHP" =~ ^[Yy]$ ]]; then
-        echo "src-git php7 https://github.com/openwrt/packages;openwrt-22.03" >> feeds.conf.default
-    fi
+    while true; do
+        echo ""
+        echo "=========== Feed Tambahan ==========="
+        echo "1. Tambahkan feed custom"
+        echo "2. Tambahkan feed PHP7 dari OpenWrt 22.03"
+        echo "3. Lewati"
+        echo "====================================="
+        read -p "Pilih (1/2/3): " FEED_OPT
+        case "$FEED_OPT" in
+            1)
+                read -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
+                echo "$LINE" >> feeds.conf.default
+                ;;
+            2)
+                echo "src-git php7 https://github.com/openwrt/packages;openwrt-22.03" >> feeds.conf.default
+                ;;
+            3)
+                break
+                ;;
+            *)
+                echo -e "${RED}Pilihan tidak valid.${NC}"
+                ;;
+        esac
+    done
 }
+
 
 # ─── Update & Install Feed ──────────────────────────────
 update_feeds() {
