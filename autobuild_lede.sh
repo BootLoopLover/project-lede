@@ -129,16 +129,14 @@ preset_configuration() {
     fi
 }
 
-# ─── Konfigurasi Feed ──────────────────────────────────────────────
+# ─── Konfigurasi Feed ───────────────────────────────────
 feed_configuration() {
     echo -e "${YELLOW}[*] Menambahkan feed tambahan...${NC}"
 
-    # Tambahkan feed custom-package (utama)
     if ! grep -q "src-git custompackage " feeds.conf.default; then
         echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
     fi
 
-    # Tambahkan feed php7-package (dengan nama berbeda)
     if ! grep -q "src-git php7package " feeds.conf.default; then
         echo 'src-git php7package https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
     fi
@@ -165,6 +163,12 @@ feed_configuration() {
     done
 }
 
+# ─── Update Feed ────────────────────────────────────────
+update_feeds() {
+    echo -e "${YELLOW}[*] Update & install feeds...${NC}"
+    ./scripts/feeds update -a
+    ./scripts/feeds install -a
+}
 
 # ─── Menu Build ─────────────────────────────────────────
 build_menu() {
