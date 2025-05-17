@@ -5,17 +5,18 @@
 #--------------------------------------------------------
 set -e
 
-# Warna
+# ─── Warna Terminal ────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
 CYAN='\033[1;36m'
 NC='\033[0m'
 
 LEDE_DIR="lede"
 START_TIME=$(date +%s)
 
-# ─── Branding ─────────────────────────────────────────────────────
+# ─── Branding ───────────────────────────────────────────
 show_branding() {
     echo -e "${CYAN}"
     echo "╔══════════════════════════════════════╗"
@@ -31,7 +32,7 @@ show_branding() {
     echo -e "${NC}"
 }
 
-# ─── Install Dependencies ─────────────────────────────────────────
+# ─── Install Dependencies ───────────────────────────────
 install_dependencies() {
     if ! grep -qEi 'ubuntu|debian' /etc/*release; then
         echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
@@ -39,12 +40,10 @@ install_dependencies() {
     fi
 
     echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
-
     sudo apt-get update
-
     sudo apt-get install -y \
         build-essential flex bison g++ gawk gcc gettext git \
-        libncurses5-dev libz-dev patch python3 python3-distutils \
+        libncurses5-dev libz-dev patch python3 \
         rsync subversion unzip zlib1g-dev file wget libssl-dev \
         ccache xsltproc libxml-parser-perl ecj fastjar \
         java-propose-classpath libglib2.0-dev libfuse-dev \
@@ -54,29 +53,44 @@ install_dependencies() {
     echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
 }
 
-# --- Fungsi pilih mode build ---
+# ─── Pilih Mode Build ───────────────────────────────────
 select_build_mode() {
     while true; do
         echo ""
         echo "============ Build Mode Selection =============="
-        echo "1. Fresh Build (clean and clone)"
-        echo "2. Rebuild (use existing 'lede' directory)"
+        echo "1. Fresh Build (hapus dan clone ulang)"
+        echo "2. Rebuild (lanjutkan direktori 'lede' yang ada)"
         echo "0. Exit"
         echo "================================================"
-    read -p "Pilih (1/2): " mode
+        read -p "Pilih (1/2): " mode
 
-    if [[ "$mode" == "1" ]]; then
-        read -p "Masukkan URL repo LEDE (default: https://github.com/coolsnowwolf/lede): " REPO
-        REPO=${REPO:-https://github.com/coolsnowwolf/lede}
-        rm -rf "$LEDE_DIR"
-        git clone "$REPO" "$LEDE_DIR"
-    elif [[ "$mode" != "2" ]]; then
-        echo -e "${RED}Pilihan tidak valid.${NC}"
-        exit 1
-    fi
+        case "$mode" in
+            1)
+                read -p "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
+                REPO=${REPO:-https://github.com/coolsnowwolf/lede}
+                rm -rf "$LEDE_DIR"
+                git clone "$REPO" "$LEDE_DIR"
+                break
+                ;;
+            2)
+                if [[ ! -d "$LEDE_DIR" ]]; then
+                    echo -e "${RED}[ERROR] Folder '$LEDE_DIR' tidak ditemukan!${NC}"
+                    exit 1
+                fi
+                break
+                ;;
+            0)
+                echo -e "${YELLOW}Keluar...${NC}"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Pilihan tidak valid.${NC}"
+                ;;
+        esac
+    done
 }
 
-# ─── Masuk Folder LEDE ────────────────────────────────────────────
+# ─── Masuk Folder LEDE ──────────────────────────────────
 run_in_lede_dir() {
     cd "$LEDE_DIR" || {
         echo -e "${RED}[ERROR] Gagal masuk folder $LEDE_DIR${NC}"
@@ -84,19 +98,18 @@ run_in_lede_dir() {
     }
 }
 
-# ─── Pilih Tag Git ────────────────────────────────────────────────
+# ─── Pilih Tag Git (Opsional) ───────────────────────────
 select_git_tag() {
-    echo -e "${YELLOW}[*] Memilih git tag (opsional)...${NC}"
+    echo -e "${YELLOW}[*] Menampilkan daftar tag git...${NC}"
     git fetch --tags
-    TAGS=$(git tag -l)
-    echo "$TAGS"
-    read -p "Masukkan tag git (atau kosongkan untuk skip): " TAG
+    git tag -l
+    read -p "Masukkan tag git untuk checkout (biarkan kosong untuk skip): " TAG
     if [[ -n "$TAG" ]]; then
         git checkout "$TAG"
     fi
 }
 
-# ─── Patch NAND (Opsional) ────────────────────────────────────────
+# ─── Patch NAND (Opsional) ──────────────────────────────
 apply_nand_patch() {
     if [[ -d "../patch-nand" ]]; then
         echo -e "${YELLOW}[*] Menerapkan patch NAND...${NC}"
@@ -104,23 +117,23 @@ apply_nand_patch() {
     fi
 }
 
-# ─── Preset Config ────────────────────────────────────────────────
+# ─── Preset Konfigurasi ─────────────────────────────────
 preset_configuration() {
     read -p "Gunakan preset config dari GitHub? (y/n): " USE_PRESET
     if [[ "$USE_PRESET" =~ ^[Yy]$ ]]; then
         read -p "Masukkan URL preset repo: " PRESET_REPO
         git clone "$PRESET_REPO" ../preset-temp
-        cp -rf ../preset-temp/files ./files 2>/dev/null || true
-        cp -f ../preset-temp/.config .config 2>/dev/null || true
+        [[ -d ../preset-temp/files ]] && cp -rf ../preset-temp/files ./files
+        [[ -f ../preset-temp/.config ]] && cp -f ../preset-temp/.config .config
         rm -rf ../preset-temp
     fi
 }
 
-# ─── Feed Custom ──────────────────────────────────────────────────
+# ─── Konfigurasi Feed ───────────────────────────────────
 feed_configuration() {
     read -p "Tambahkan feed custom? (y/n): " FEED_CUSTOM
     if [[ "$FEED_CUSTOM" =~ ^[Yy]$ ]]; then
-        read -p "Masukkan baris feed misal: src-git custom https://github.com/xxx.git: " LINE
+        read -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
         echo "$LINE" >> feeds.conf.default
     fi
     read -p "Tambahkan feed PHP7 dari OpenWrt 22.03? (y/n): " FEED_PHP
@@ -129,7 +142,7 @@ feed_configuration() {
     fi
 }
 
-# ─── Update Feed ──────────────────────────────────────────────────
+# ─── Update & Install Feed ──────────────────────────────
 update_feeds() {
     read -p "Update dan install feeds? (y/n): " FEEDS
     if [[ "$FEEDS" =~ ^[Yy]$ ]]; then
@@ -138,39 +151,40 @@ update_feeds() {
     fi
 }
 
-# ─── Menu Build ───────────────────────────────────────────────────
+# ─── Menu Build ─────────────────────────────────────────
 build_menu() {
-        echo "============= Build Menu =============="
-        echo "1. Run 'make menuconfig'"
-        echo "2. Start build immediately"
-        echo "3. Exit"
-        echo "======================================="
-    read -p "Pilih (1/2): " BACT
-
-    if [[ "$BACT" == "1" ]]; then
-        make menuconfig
-    fi
+    echo ""
+    echo "============= Build Menu =============="
+    echo "1. Jalankan 'make menuconfig'"
+    echo "2. Langsung mulai build"
+    echo "3. Keluar"
+    echo "======================================="
+    read -p "Pilih (1/2/3): " BACT
+    case "$BACT" in
+        1) make menuconfig ;;
+        2) ;;
+        3) echo -e "${YELLOW}Keluar...${NC}"; exit 0 ;;
+        *) echo -e "${RED}Pilihan tidak valid.${NC}" ;;
+    esac
 }
 
-# ─── Mulai Build ──────────────────────────────────────────────────
+# ─── Build Firmware ─────────────────────────────────────
 start_build() {
-    echo -e "${CYAN}[*] Memulai build...${NC}"
-    make -j"$(nproc)" || make V=s
+    echo -e "${CYAN}[*] Memulai proses build...${NC}"
+    if ! make -j"$(nproc)"; then
+        echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
+        make V=s
+    fi
     END_TIME=$(date +%s)
-    BUILD_DURATION=$((END_TIME - START_TIME))
-    echo -e "${GREEN}[✔] Build selesai dalam $BUILD_DURATION detik.${NC}"
+    echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
 }
 
-# ─── Main ─────────────────────────────────────────────────────────
+# ─── Main ───────────────────────────────────────────────
 main() {
     show_branding
 
-    read -p "Install build dependencies? (y/n): " INSTALL_DEPS
-    if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
-        install_dependencies
-    else
-        echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
-    fi
+    read -p "Install dependencies build? (y/n): " INSTALL_DEPS
+    [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]] && install_dependencies || echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
 
     select_build_mode
     run_in_lede_dir
