@@ -129,14 +129,19 @@ preset_configuration() {
     fi
 }
 
-# ─── Konfigurasi Feed ───────────────────────────────────
+# ─── Konfigurasi Feed ──────────────────────────────────────────────
 feed_configuration() {
+    echo -e "${YELLOW}[*] Menambahkan feed tambahan...${NC}"
+    
+    # Tambahkan feed custompackage selalu
+    echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
+    echo 'src-git custompackage https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+
     while true; do
         echo ""
         echo "=========== Feed Tambahan ==========="
-        echo "1. Tambahkan feed custom"
-        echo "2. Tambahkan feed PHP7 dari OpenWrt 22.03"
-        echo "3. Lewati"
+        echo "1. Tambahkan feed custom manual"
+        echo "2. Skip"
         echo "====================================="
         read -p "Pilih (1/2/3): " FEED_OPT
         case "$FEED_OPT" in
@@ -144,10 +149,8 @@ feed_configuration() {
                 read -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
                 echo "$LINE" >> feeds.conf.default
                 ;;
+                
             2)
-                echo "src-git php7 https://github.com/openwrt/packages;openwrt-22.03" >> feeds.conf.default
-                ;;
-            3)
                 break
                 ;;
             *)
@@ -156,7 +159,6 @@ feed_configuration() {
         esac
     done
 }
-
 
 # ─── Update & Install Feed ──────────────────────────────
 update_feeds() {
