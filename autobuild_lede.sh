@@ -180,7 +180,7 @@ feed_configuration() {
     done
 }
 
-# ─── Menu Update Feed & Build (Loop) ───────────────────────
+#feeds and build menu
 feeds_and_build_menu() {
     while true; do
         echo ""
@@ -214,7 +214,7 @@ feeds_and_build_menu() {
                 ;;
             4)
                 echo -e "${YELLOW}Keluar...${NC}"
-                break
+                exit 0
                 ;;
             *)
                 echo -e "${RED}Pilihan tidak valid.${NC}"
@@ -222,6 +222,7 @@ feeds_and_build_menu() {
         esac
     done
 }
+
 
 # ─── Build Firmware ─────────────────────────────────────
 start_build() {
