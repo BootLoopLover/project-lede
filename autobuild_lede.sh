@@ -90,16 +90,16 @@ select_distro() {
 #---------- Clone Repo ----------
 clone_repo() {
   echo -e "\nMasukkan nama folder build (contoh: build-openwrt):"
-  read -rp "Folder: " FOLDER
+  read -p "Folder: " FOLDER
   git clone "$GIT_URL" "$FOLDER"
   cd "$FOLDER" || exit
 
   echo -e "\nIngin checkout tag/branch tertentu? (y/n)"
-  read -rp "> " CHOICE
+  read -p "> " CHOICE
   if [[ $CHOICE =~ [Yy] ]]; then
     git fetch --all
     echo -e "\nMasukkan nama tag/branch:"
-    read -rp "Tag/Branch: " TAG
+    read -p "Tag/Branch: " TAG
     git checkout "$TAG"
   fi
 }
@@ -125,7 +125,7 @@ add_extra_feeds() {
 #---------- Update Feed ----------
 update_feeds() {
   echo -e "\nUpdate dan install feeds sekarang? (y/n)"
-  read -rp "> " FEED_CHOICE
+  read -p "> " FEED_CHOICE
   if [[ $FEED_CHOICE =~ [Yy] ]]; then
     ./scripts/feeds update -a
     ./scripts/feeds install -f -a
@@ -205,7 +205,7 @@ select MODE in "Fresh Build" "Rebuild"; do
       break ;;
     "Rebuild")
       echo -e "\nMasukkan path folder build:"
-      read -rp "Path: " BUILD_PATH
+      read -p "Path: " BUILD_PATH
       cd "$BUILD_PATH" || exit
       update_feeds
       while ! build_menu; do :; done
