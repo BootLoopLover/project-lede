@@ -109,16 +109,19 @@ clean_build_menu() {
 feeds_and_build_menu() {
     while true; do
         echo -e "${YELLOW}Pilih opsi:${NC}"
-        echo "1) Update feeds dan install semua"
-        echo "2) Menuconfig"
+        echo "1) Update feeds + make menuconfig"
+        echo "2) Make menuconfig"
         echo "3) Build firmware"
         echo "4) Keluar"
         read -rp "Masukkan pilihan [1-4]: " choice
         case $choice in
             1)
-                echo -e "${YELLOW}Mengupdate feeds dan menginstall semua...${NC}"
+                echo -e "${YELLOW}Update feeds dan run menuconfig...${NC}"
                 ./scripts/feeds update -a
                 ./scripts/feeds install -a
+                echo -e "${GREEN}[✔] Feeds fully updates.${NC}"
+                echo -e "${YELLOW}Masuk menuconfig...${NC}"
+                make menuconfig
                 ;;
             2)
                 echo -e "${YELLOW}Masuk menuconfig...${NC}"
