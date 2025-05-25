@@ -63,11 +63,11 @@ select_build_mode() {
         echo "2. Rebuild (lanjutkan direktori 'lede' yang ada)"
         echo "0. Exit"
         echo "================================================"
-        read -r -p "Pilih (1/2/0): " mode
+        read -rp "Pilih (1/2/0): " mode
 
         case "$mode" in
             1)
-                read -r -p "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
+                read -rp "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
                 REPO=${REPO:-https://github.com/coolsnowwolf/lede}
                 rm -rf "$LEDE_DIR"
                 git clone "$REPO" "$LEDE_DIR"
@@ -101,7 +101,7 @@ run_in_lede_dir() {
 
 # ─── Patch NAND (Opsional) ──────────────────────────────
 apply_nand_patch() {
-    if [[ -d ../patch-nand ]]; then
+    if [[ -d "../patch-nand" ]]; then
         echo -e "${YELLOW}[*] Menerapkan patch NAND...${NC}"
         cp -rf ../patch-nand/* target/linux/
     fi
@@ -112,12 +112,12 @@ use_preset_menu() {
     echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
     echo "1) ✅ Ya (untuk penggunaan pribadi)"
     echo "2) ❌ Tidak (konfigurasi manual)"
-    read -r -p "📌 Pilih opsi [1-2]: " preset_answer
+    read -rp "📌 Pilih opsi [1-2]: " preset_answer
 
     if [[ "$preset_answer" == "1" ]]; then
-        if [[ ! -d ../preset ]]; then
+        if [[ ! -d "../preset" ]]; then
             echo -e "${BLUE}Meng-clone repository preset...${NC}"
-            git clone "https://github.com/BootLoopLover/preset.git" ../preset || {
+            git clone "https://github.com/BootLoopLover/preset.git" "../preset" || {
                 echo -e "${RED}❌ Gagal clone preset.${NC}"
                 exit 1
             }
@@ -129,18 +129,13 @@ use_preset_menu() {
             echo "$((i + 1))) ${folders[$i]}"
         done
 
-        read -r -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
+        read -rp "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
 
         if [[ "$preset_choice" =~ ^[0-9]+$ ]] && (( preset_choice >= 1 && preset_choice <= ${#folders[@]} )); then
             selected_folder="../preset/${folders[$((preset_choice - 1))]}"
-            if [[ -d "$selected_folder" ]]; then
-                cp -rf "$selected_folder"/* ./
-                if [[ -f "$selected_folder/config-nss" ]]; then
-                    cp "$selected_folder/config-nss" .config
-                fi
-            else
-                echo -e "${RED}Folder preset tidak ditemukan.${NC}"
-                exit 1
+            cp -rf "$selected_folder"/* ./
+            if [[ -f "$selected_folder/config-nss" ]]; then
+                cp "$selected_folder/config-nss" .config
             fi
         else
             echo -e "${RED}Pilihan preset tidak valid.${NC}"
@@ -158,12 +153,6 @@ use_preset_menu() {
 feed_configuration() {
     echo -e "${YELLOW}[*] Menambahkan feed tambahan...${NC}"
 
-    # Pastikan feeds.conf.default ada
-    if [[ ! -f feeds.conf.default ]]; then
-        echo -e "${RED}feeds.conf.default tidak ditemukan!${NC}"
-        exit 1
-    fi
-
     if ! grep -q "src-git custompackage " feeds.conf.default; then
         echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
     fi
@@ -178,10 +167,10 @@ feed_configuration() {
         echo "1. Tambahkan feed custom manual"
         echo "2. Lewati"
         echo "====================================="
-        read -r -p "Pilih (1/2): " FEED_OPT
+        read -rp "Pilih (1/2): " FEED_OPT
         case "$FEED_OPT" in
             1)
-                read -r -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
+                read -rp "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
                 echo "$LINE" >> feeds.conf.default
                 ;;
             2)
@@ -204,7 +193,7 @@ feeds_and_build_menu() {
         echo "3. Mulai build firmware"
         echo "4. Keluar"
         echo "======================================="
-        read -r -p "Pilih (1/2/3/4): " MENU_OPT
+        read -rp "Pilih (1/2/3/4): " MENU_OPT
 
         case "$MENU_OPT" in
             1)
@@ -237,22 +226,11 @@ feeds_and_build_menu() {
     done
 }
 
-# ─── Build Firmware ─────────────────────────────────────
-start_build() {
-    echo -e "${CYAN}[*] Memulai proses build...${NC}"
-    if ! make -j"$(nproc)"; then
-        echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
-        make V=s
-    fi
-    END_TIME=$(date +%s)
-    echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
-}
-
 # ─── Main ───────────────────────────────────────────────
 main() {
     show_branding
 
-    read -r -p "Install dependencies build? (y/n): " INSTALL_DEPS
+    read -rp "Install dependencies build? (y/n): " INSTALL_DEPS
     if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
         install_dependencies
     else
