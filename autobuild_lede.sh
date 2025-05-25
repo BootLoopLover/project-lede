@@ -1,4 +1,3 @@
-
 #!/bin/bash
 #--------------------------------------------------------
 # 🚀 LEDE Builder - Professional Version
@@ -21,11 +20,7 @@ show_banner() {
         sleep 0.01
     done
     echo -e "\n"
-    for _ in {1..60}; do
-        echo -ne "${BLUE}=${NC}"
-        sleep 0.005
-    done
-    echo -e "\n"
+    printf "${BLUE}%.0s=" {1..60}; echo -e "${NC}"
     echo -e "${BLUE}"
     cat << "EOF"
     ___                   __                 
@@ -39,16 +34,12 @@ show_banner() {
    ___             _         __        
   / _ \_______    (_)__ ____/ /_       
  / ___/ __/ _ \  / / -_) __/ __/  _ _ _ 
-/_/  /_/  \___/_/ /\__/\__/\__/  (_|_|_)
+/_/ /_/  \___/_/ /\__/\__/\__/  (_|_|_)
              |___/ 
   LEDE Firmware Builder
 EOF
     echo -e "${NC}"
-    for _ in {1..60}; do
-        echo -ne "${BLUE}-${NC}"
-        sleep 0.005
-    done
-    echo -e "\n"
+    printf "${BLUE}%.0s-" {1..60}; echo -e "${NC}"
     echo "========================================================="
     echo -e "📦 ${BLUE}LEDE Firmware Builder${NC}"
     echo "========================================================="
@@ -130,14 +121,11 @@ use_preset_menu() {
         if [[ "$preset_choice" =~ ^[0-9]+$ && "$preset_choice" -ge 1 && "$preset_choice" -le ${#folders[@]} ]]; then
             selected_folder="../preset/${folders[$((preset_choice-1))]}"
             cp -rf "$selected_folder"/* ./
-            if [[ -f "$selected_folder/config-nss" ]]; then
-                cp "$selected_folder/config-nss" .config
-            fi
+            [[ -f "$selected_folder/config-nss" ]] && cp "$selected_folder/config-nss" .config
         else
             echo -e "${RED}⚠️ Invalid preset selection.${NC}"
         fi
     else
-        # Jika pilih manual, pastikan .config ada atau user akan buat sendiri nanti
         [[ ! -f .config ]] && echo -e "${YELLOW}⚠️ No .config file found, you'll need to create one manually later.${NC}"
     fi
 }
@@ -180,6 +168,21 @@ build_action_menu() {
     return 1
 }
 
+start_build() {
+    echo -e "${BLUE}Starting build...${NC}"
+    start_time=$(date +%s)
+    make -j"$(nproc)" || {
+        echo -e "${YELLOW}⚠️ Build failed. Retrying with verbose output...${NC}"
+        make -j1 V=s || {
+            echo -e "${RED}❌ Build failed again. Exiting.${NC}"
+            exit 1
+        }
+    }
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+    echo -e "${GREEN}✅ Build completed in $((duration / 60)) min $((duration % 60)) sec.${NC}"
+}
+
 fresh_build() {
     read -rp "📁 Enter build folder name (default: lede_build): " folder_name
     folder_name="${folder_name:-lede_build}"
@@ -196,17 +199,24 @@ fresh_build() {
     echo -e "${BLUE}Updating and installing feeds...${NC}"
     ./scripts/feeds update -a && ./scripts/feeds install -f -a
 
+    while ! build_action_menu; do :; done
+    start_build
 }
 
 rebuild_mode() {
     while true; do
         show_banner
         echo -e "📂 ${BLUE}Select existing build folder:${NC}"
-        mapfile -t folders < <(find . -maxdepth 1 -type d \( ! -name . \) -printf '%f\n')
+        folders=()
+        while IFS= read -r -d '' folder; do
+            folders+=("$(basename "$folder")")
+        done < <(find . -mindepth 1 -maxdepth 1 -type d -print0)
+
         if [[ ${#folders[@]} -eq 0 ]]; then
             echo -e "${RED}❌ No build folders found in current directory.${NC}"
             exit 1
         fi
+
         for i in "${!folders[@]}"; do
             echo "$((i+1))) ${folders[$i]}"
         done
