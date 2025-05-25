@@ -106,45 +106,39 @@ apply_nand_patch() {
     fi
 }
 
-# ─── Preset Konfigurasi ─────────────────────────────────
-preset_configuration() {
-    echo ""
-    echo "=========== Preset Konfigurasi ==========="
-    echo "1. Gunakan preset dari BootLoopLover (project-lede)"
-    echo "2. Masukkan URL preset manual"
-    echo "3. Lewati preset"
-    echo "=========================================="
-    read -p "Pilih (1/2/3): " PRESET_OPT
+# ─── Fungsi Penggunaan Preset (Menggantikan preset_configuration) ───────────────────────────────
+use_preset_menu() {
+    echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
+    echo "1) ✅ Ya (untuk penggunaan pribadi)"
+    echo "2) ❌ Tidak (konfigurasi manual)"
+    read -p "📌 Pilih opsi [1-2]: " preset_answer
 
-    case "$PRESET_OPT" in
-        1)
-            PRESET_REPO="https://github.com/BootLoopLover/preset-lede.git"
-            ;;
-        2)
-            read -p "Masukkan URL preset repo: " PRESET_REPO
-            ;;
-        3)
-            echo -e "${YELLOW}[*] Melewati penggunaan preset.${NC}"
-            return
-            ;;
-        *)
-            echo -e "${RED}Pilihan tidak valid.${NC}"
-            preset_configuration  # ulangi jika salah input
-            return
-            ;;
-    esac
+    if [[ "$preset_answer" == "1" ]]; then
+        if [[ ! -d "../preset" ]]; then
+            echo -e "${BLUE}Meng-clone repository preset...${NC}"
+            git clone "https://github.com/BootLoopLover/preset.git" "../preset" || {
+                echo -e "${RED}❌ Gagal clone preset.${NC}"
+                exit 1
+            }
+        fi
 
-    echo -e "${YELLOW}[*] Mengambil preset dari: $PRESET_REPO${NC}"
-    git clone "$PRESET_REPO" ../preset-temp || {
-        echo -e "${RED}[ERROR] Gagal clone preset repo.${NC}"
-        return
-    }
-    [[ -d ../preset-temp/files ]] && cp -rf ../preset-temp/files ./files
-    [[ -f ../preset-temp/.config ]] && cp -f ../preset-temp/.config .config
-    rm -rf ../preset-temp
-    echo -e "${GREEN}[✔] Preset berhasil diterapkan.${NC}"
+        echo -e "${BLUE}Daftar preset tersedia:${NC}"
+        mapfile -t folders < <(find ../preset -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        for i in "${!folders[@]}"; do
+            echo "$((i + 1))) ${folders[$i]}"
+        done
+
+        read -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
+        selected_folder="../preset/${folders[$((preset_choice - 1))]}"
+        cp -rf "$selected_folder"/* ./
+
+        if [[ -f "$selected_folder/config-nss" ]]; then
+            cp "$selected_folder/config-nss" .config
+        fi
+    else
+        [[ ! -f .config ]] && make menuconfig
+    fi
 }
-
 
 # ─── Konfigurasi Feed ───────────────────────────────────
 feed_configuration() {
@@ -180,7 +174,7 @@ feed_configuration() {
     done
 }
 
-#feeds and build menu
+# ─── Menu Update Feed dan Build ─────────────────────────
 feeds_and_build_menu() {
     while true; do
         echo ""
@@ -223,7 +217,6 @@ feeds_and_build_menu() {
     done
 }
 
-
 # ─── Build Firmware ─────────────────────────────────────
 start_build() {
     echo -e "${CYAN}[*] Memulai proses build...${NC}"
@@ -245,7 +238,7 @@ main() {
     select_build_mode
     run_in_lede_dir
     apply_nand_patch
-    preset_configuration
+    use_preset_menu
     feed_configuration
     feeds_and_build_menu
     start_build
