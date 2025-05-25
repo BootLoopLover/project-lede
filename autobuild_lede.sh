@@ -49,7 +49,7 @@ install_dependencies() {
         clang lld llvm libelf-dev device-tree-compiler \
         bc u-boot-tools qemu-utils asciidoc sudo time
 
-    echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
+    echo -e "${GREEN}[\u2714] Dependencies berhasil diinstall.${NC}"
 }
 
 # ─── Pilih Mode Build ───────────────────────────────────
@@ -83,6 +83,48 @@ run_in_lede_dir() {
     cd "$LEDE_DIR" || exit 1
 }
 
+# ─── Patch NAND (Opsional) ──────────────────────────────
+apply_nand_patch() {
+    if [[ -d "../patch-nand" ]]; then
+        echo -e "${YELLOW}[*] Menerapkan patch NAND...${NC}"
+        cp -rf ../patch-nand/* target/linux/
+    fi
+}
+
+# ─── Fungsi Penggunaan Preset ───────────────────────────
+use_preset_menu() {
+    echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
+    echo "1) ✅ Ya (untuk penggunaan pribadi)"
+    echo "2) ❌ Tidak (konfigurasi manual)"
+    read -p "📌 Pilih opsi [1-2]: " preset_answer
+
+    if [[ "$preset_answer" == "1" ]]; then
+        if [[ ! -d "../preset" ]]; then
+            echo -e "${BLUE}Meng-clone repository preset...${NC}"
+            git clone "https://github.com/BootLoopLover/preset.git" "../preset" || {
+                echo -e "${RED}❌ Gagal clone preset.${NC}"
+                exit 1
+            }
+        fi
+
+        echo -e "${BLUE}Daftar preset tersedia:${NC}"
+        mapfile -t folders < <(find ../preset -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        for i in "${!folders[@]}"; do
+            echo "$((i + 1))) ${folders[$i]}"
+        done
+
+        read -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
+        selected_folder="../preset/${folders[$((preset_choice - 1))]}"
+        cp -rf "$selected_folder"/* ./
+
+        if [[ -f "$selected_folder/config-nss" ]]; then
+            cp "$selected_folder/config-nss" .config
+        fi
+    else
+        [[ ! -f .config ]] && make menuconfig
+    fi
+}
+
 # ─── Opsi Clean Build ───────────────────────────────────
 clean_build_menu() {
     echo -e "${YELLOW}Apakah ingin melakukan clean build (hapus hasil kompilasi sebelumnya)?${NC}"
@@ -94,7 +136,7 @@ clean_build_menu() {
             echo -e "${BLUE}[INFO] Melakukan clean build...${NC}"
             make clean
             make dirclean
-            echo -e "${GREEN}[✔] Clean build selesai.${NC}"
+            echo -e "${GREEN}[\u2714] Clean build selesai.${NC}"
             ;;
         2)
             echo -e "${BLUE}[INFO] Melewati tahap clean build.${NC}"
@@ -119,7 +161,7 @@ feeds_and_build_menu() {
                 echo -e "${YELLOW}Update feeds dan run menuconfig...${NC}"
                 ./scripts/feeds update -a
                 ./scripts/feeds install -a
-                echo -e "${GREEN}[✔] Feeds fully updates.${NC}"
+                echo -e "${GREEN}[\u2714] Feeds fully updates.${NC}"
                 echo -e "${YELLOW}Masuk menuconfig...${NC}"
                 make menuconfig
                 ;;
@@ -134,9 +176,9 @@ feeds_and_build_menu() {
                 if make -j"$(nproc)"; then
                     BUILD_END=$(date +%s)
                     BUILD_DURATION=$((BUILD_END - BUILD_START))
-                    echo -e "${GREEN}[✔] Build selesai dalam waktu: $(date -u -d @$BUILD_DURATION +"%H:%M:%S")${NC}"
+                    echo -e "${GREEN}[\u2714] Build selesai dalam waktu: $(date -u -d @$BUILD_DURATION +"%H:%M:%S")${NC}"
                 else
-                    echo -e "${RED}[✘] Build gagal.${NC}"
+                    echo -e "${RED}[\u2718] Build gagal.${NC}"
                     exit 1
                 fi
                 ;;
@@ -157,6 +199,8 @@ main() {
     install_dependencies
     select_build_mode
     run_in_lede_dir
+    apply_nand_patch
+    use_preset_menu
     feeds_and_build_menu
 }
 
