@@ -1,6 +1,6 @@
 #!/bin/bash
 #--------------------------------------------------------
-# LEDE Firmware Autobuild Script - Final Version
+# LEDE Firmware Autobuild Script
 # Author: Pakalolo Waraso
 #--------------------------------------------------------
 set -e
@@ -14,6 +14,7 @@ CYAN='\033[1;36m'
 NC='\033[0m'
 
 LEDE_DIR="lede"
+START_TIME=$(date +%s)
 
 # ─── Branding ───────────────────────────────────────────
 show_branding() {
@@ -31,92 +32,70 @@ show_branding() {
     echo -e "${NC}"
 }
 
-# ─── Install Dependencies dengan prompt Y/N ─────────────
-install_dependencies_prompt() {
-    read -rp "$(echo -e ${YELLOW}Ingin install dependencies build? (y/n): ${NC})" yn
-    case "$yn" in
-        [Yy]* )
-            if ! grep -qEi 'ubuntu|debian' /etc/*release; then
-                echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
-                exit 1
-            fi
+# ─── Install Dependencies ───────────────────────────────
+install_dependencies() {
+    if ! grep -qEi 'ubuntu|debian' /etc/*release; then
+        echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
+        exit 1
+    fi
 
-            echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
-            sudo apt-get update
-            sudo apt-get install -y \
-                build-essential flex bison g++ gawk gcc gettext git \
-                libncurses5-dev libz-dev patch python3 \
-                rsync subversion unzip zlib1g-dev file wget libssl-dev \
-                ccache xsltproc libxml-parser-perl ecj fastjar \
-                java-propose-classpath libglib2.0-dev libfuse-dev \
-                clang lld llvm libelf-dev device-tree-compiler \
-                bc u-boot-tools qemu-utils asciidoc sudo time
-            echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
-            ;;
-        * )
-            echo -e "${BLUE}Lewati instalasi dependencies.${NC}"
-            ;;
-    esac
+    echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
+    sudo apt-get update
+    sudo apt-get install -y \
+        build-essential flex bison g++ gawk gcc gettext git \
+        libncurses5-dev libz-dev patch python3 \
+        rsync subversion unzip zlib1g-dev file wget libssl-dev \
+        ccache xsltproc libxml-parser-perl ecj fastjar \
+        java-propose-classpath libglib2.0-dev libfuse-dev \
+        clang lld llvm libelf-dev device-tree-compiler \
+        bc u-boot-tools qemu-utils asciidoc sudo time
+
+    echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
 }
 
 # ─── Pilih Mode Build ───────────────────────────────────
 select_build_mode() {
-    echo -e "${YELLOW}Pilih mode build:${NC}"
-    echo "1) Fresh build (clone ulang LEDE)"
-    echo "2) Rebuild dari folder yang sudah ada"
-    read -rp "Masukkan pilihan [1-2]: " mode
-    case $mode in
-        1)
-            echo -e "${BLUE}[INFO] Melakukan fresh clone dari repo LEDE...${NC}"
-            rm -rf "$LEDE_DIR"
-            git clone --depth=1 https://github.com/coolsnowwolf/lede "$LEDE_DIR"
-            ;;
-        2)
-            echo -e "${BLUE}[INFO] Menggunakan folder build yang sudah ada.${NC}"
-            ;;
-        *)
-            echo -e "${RED}Pilihan tidak valid.${NC}"
-            exit 1
-            ;;
-    esac
+    while true; do
+        echo ""
+        echo "============ Build Mode Selection =============="
+        echo "1. Fresh Build (hapus dan clone ulang)"
+        echo "2. Rebuild (lanjutkan direktori 'lede' yang ada)"
+        echo "0. Exit"
+        echo "================================================"
+        read -rp "Pilih (1/2/0): " mode
+
+        case "$mode" in
+            1)
+                read -rp "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
+                REPO=${REPO:-https://github.com/coolsnowwolf/lede}
+                rm -rf "$LEDE_DIR"
+                git clone "$REPO" "$LEDE_DIR"
+                break
+                ;;
+            2)
+                if [[ ! -d "$LEDE_DIR" ]]; then
+                    echo -e "${RED}[ERROR] Folder '$LEDE_DIR' tidak ditemukan!${NC}"
+                    exit 1
+                fi
+                break
+                ;;
+            0)
+                echo -e "${YELLOW}Keluar...${NC}"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Pilihan tidak valid.${NC}"
+                ;;
+        esac
+    done
 }
 
 # ─── Masuk Folder LEDE ──────────────────────────────────
 run_in_lede_dir() {
-    if [ ! -d "$LEDE_DIR" ]; then
-        echo -e "${RED}[ERROR] Folder '$LEDE_DIR' tidak ditemukan.${NC}"
+    cd "$LEDE_DIR" || {
+        echo -e "${RED}[ERROR] Gagal masuk folder $LEDE_DIR${NC}"
         exit 1
-    fi
-    cd "$LEDE_DIR" || exit 1
-}
-
-# ─── Tambahkan Feed Ekstra (Custom/PHP7) ────────────────
-add_extra_feeds() {
-    echo -e "${BLUE}➕ Ingin menambahkan feed tambahan?${NC}"
-    echo "1) Tidak (default feeds saja)"
-    echo "2) Tambahkan feed custom"
-    echo "3) Tambahkan feed php7"
-    echo "4) Tambahkan keduanya (custom + php7)"
-    read -rp "📦 Pilih opsi [1-4]: " feed_option
-
-    case "$feed_option" in
-        2)
-            echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default
-            echo -e "${GREEN}[✔] Feed custom ditambahkan.${NC}"
-            ;;
-        3)
-            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default
-            echo -e "${GREEN}[✔] Feed php7 ditambahkan.${NC}"
-            ;;
-        4)
-            echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default
-            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default
-            echo -e "${GREEN}[✔] Feed custom dan php7 ditambahkan.${NC}"
-            ;;
-        *)
-            echo -e "${BLUE}[INFO] Tidak ada feed tambahan ditambahkan.${NC}"
-            ;;
-    esac
+    }
 }
 
 # ─── Patch NAND (Opsional) ──────────────────────────────
@@ -127,12 +106,12 @@ apply_nand_patch() {
     fi
 }
 
-# ─── Fungsi Penggunaan Preset (Tanpa mapfile agar kompatibel) ─────────────
+# ─── Fungsi Penggunaan Preset ───────────────────────────
 use_preset_menu() {
     echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
     echo "1) ✅ Ya (untuk penggunaan pribadi)"
     echo "2) ❌ Tidak (konfigurasi manual)"
-    read -p "📌 Pilih opsi [1-2]: " preset_answer
+    read -rp "📌 Pilih opsi [1-2]: " preset_answer
 
     if [[ "$preset_answer" == "1" ]]; then
         if [[ ! -d "../preset" ]]; then
@@ -144,86 +123,54 @@ use_preset_menu() {
         fi
 
         echo -e "${BLUE}Daftar preset tersedia:${NC}"
-        folders=()
-        for d in ../preset/*/ ; do
-            [ -d "$d" ] && folders+=("$(basename "$d")")
-        done
-
+        mapfile -t folders < <(find ../preset -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
         for i in "${!folders[@]}"; do
             echo "$((i + 1))) ${folders[$i]}"
         done
 
-        read -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
-        selected_folder="../preset/${folders[$((preset_choice - 1))]}"
-        cp -rf "$selected_folder"/* ./
+        read -rp "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
 
-        if [[ -f "$selected_folder/config-nss" ]]; then
-            cp "$selected_folder/config-nss" .config
+        if [[ "$preset_choice" =~ ^[0-9]+$ ]] && (( preset_choice >= 1 && preset_choice <= ${#folders[@]} )); then
+            selected_folder="../preset/${folders[$((preset_choice - 1))]}"
+            cp -rf "$selected_folder"/* ./
+            if [[ -f "$selected_folder/config-nss" ]]; then
+                cp "$selected_folder/config-nss" .config
+            fi
+        else
+            echo -e "${RED}Pilihan preset tidak valid.${NC}"
+            exit 1
         fi
     else
+        # Jika tidak pakai preset dan .config tidak ada, langsung menuconfig
         [[ ! -f .config ]] && make menuconfig
     fi
 }
 
-# ─── Opsi Clean Build ───────────────────────────────────
-clean_build_menu() {
-    echo -e "${YELLOW}Apakah ingin melakukan clean build (hapus hasil kompilasi sebelumnya)?${NC}"
-    echo "1) Ya, bersihkan semua (make clean && make dirclean)"
-    echo "2) Tidak, lanjutkan tanpa clean build"
-    read -rp "Masukkan pilihan [1-2]: " clean_choice
-    case $clean_choice in
-        1)
-            echo -e "${BLUE}[INFO] Melakukan clean build...${NC}"
-            make clean
-            make dirclean
-            echo -e "${GREEN}[✔] Clean build selesai.${NC}"
-            ;;
-        2)
-            echo -e "${BLUE}[INFO] Melewati tahap clean build.${NC}"
-            ;;
-        *)
-            echo -e "${RED}Pilihan tidak valid, melewati tahap clean build.${NC}"
-            ;;
-    esac
-}
+# ─── Konfigurasi Feed ───────────────────────────────────
+feed_configuration() {
+    echo -e "${YELLOW}[*] Menambahkan feed tambahan...${NC}"
 
-# ─── Menu Build (Update Feeds + Build) ─────────────────
-feeds_and_build_menu() {
+    if ! grep -q "src-git custompackage " feeds.conf.default; then
+        echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
+    fi
+
+    if ! grep -q "src-git php7package " feeds.conf.default; then
+        echo 'src-git php7package https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+    fi
+
     while true; do
-        echo -e "${YELLOW}Pilih opsi:${NC}"
-        echo "1) Update feeds + make menuconfig"
-        echo "2) Make menuconfig"
-        echo "3) Build firmware"
-        echo "4) Keluar"
-        read -rp "Masukkan pilihan [1-4]: " choice
-        case $choice in
+        echo ""
+        echo "=========== Feed Tambahan ==========="
+        echo "1. Tambahkan feed custom manual"
+        echo "2. Lewati"
+        echo "====================================="
+        read -rp "Pilih (1/2): " FEED_OPT
+        case "$FEED_OPT" in
             1)
-                echo -e "${YELLOW}Update feeds dan run menuconfig...${NC}"
-                ./scripts/feeds update -a
-                ./scripts/feeds install -f -a
-                echo -e "${GREEN}[✔] Feeds berhasil diupdate.${NC}"
-                echo -e "${YELLOW}Masuk menuconfig...${NC}"
-                make menuconfig
+                read -rp "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
+                echo "$LINE" >> feeds.conf.default
                 ;;
             2)
-                echo -e "${YELLOW}Masuk menuconfig...${NC}"
-                make menuconfig
-                ;;
-            3)
-                clean_build_menu
-                echo -e "${YELLOW}Memulai build firmware...${NC}"
-                BUILD_START=$(date +%s)
-                if make -j"$(nproc)"; then
-                    BUILD_END=$(date +%s)
-                    BUILD_DURATION=$((BUILD_END - BUILD_START))
-                    echo -e "${GREEN}[✔] Build selesai dalam waktu: $(date -u -d @$BUILD_DURATION +"%H:%M:%S")${NC}"
-                else
-                    echo -e "${RED}[✘] Build gagal.${NC}"
-                    exit 1
-                fi
-                ;;
-            4)
-                echo -e "${CYAN}Keluar dari menu build.${NC}"
                 break
                 ;;
             *)
@@ -233,4 +180,77 @@ feeds_and_build_menu() {
     done
 }
 
-# ─── Eksekusi Utama ─────────────────────────────────────
+# ─── Menu Update Feed dan Build ─────────────────────────
+feeds_and_build_menu() {
+    while true; do
+        echo ""
+        echo "========= Menu Update & Build ========="
+        echo "1. Update & install feeds + jalankan menuconfig"
+        echo "2. Jalankan 'make menuconfig' saja"
+        echo "3. Mulai build firmware"
+        echo "4. Keluar"
+        echo "======================================="
+        read -rp "Pilih (1/2/3/4): " MENU_OPT
+
+        case "$MENU_OPT" in
+            1)
+                echo -e "${YELLOW}[*] Update & install feeds...${NC}"
+                ./scripts/feeds update -a
+                ./scripts/feeds install -a
+                echo -e "${CYAN}[*] Menjalankan menuconfig...${NC}"
+                make menuconfig
+                ;;
+            2)
+                make menuconfig
+                ;;
+            3)
+                echo -e "${CYAN}[*] Memulai proses build...${NC}"
+                if ! make -j"$(nproc)"; then
+                    echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
+                    make V=s
+                fi
+                END_TIME=$(date +%s)
+                echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
+                ;;
+            4)
+                echo -e "${YELLOW}Keluar...${NC}"
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}Pilihan tidak valid.${NC}"
+                ;;
+        esac
+    done
+}
+
+# ─── Build Firmware ─────────────────────────────────────
+start_build() {
+    echo -e "${CYAN}[*] Memulai proses build...${NC}"
+    if ! make -j"$(nproc)"; then
+        echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
+        make V=s
+    fi
+    END_TIME=$(date +%s)
+    echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
+}
+
+# ─── Main ───────────────────────────────────────────────
+main() {
+    show_branding
+
+    read -rp "Install dependencies build? (y/n): " INSTALL_DEPS
+    if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
+        install_dependencies
+    else
+        echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
+    fi
+
+    select_build_mode
+    run_in_lede_dir
+    apply_nand_patch
+    use_preset_menu
+    feed_configuration
+    feeds_and_build_menu
+}
+
+main "$@"
