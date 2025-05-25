@@ -1,8 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 #--------------------------------------------------------
-# LEDE Firmware Autobuild Script (sh compatible)
+# LEDE Firmware Autobuild Script
 # Author: Pakalolo Waraso
 #--------------------------------------------------------
+set -euo pipefail
+IFS=$'\n\t'
 
 # ─── Warna Terminal ────────────────────────────────────
 RED='\033[0;31m'
@@ -15,35 +17,30 @@ NC='\033[0m'
 LEDE_DIR="lede"
 START_TIME=$(date +%s)
 
-# Fungsi echo warna portable
-echo_color() {
-    # $1 = color code, $2 = message
-    printf "%b%s%b\n" "$1" "$2" "$NC"
-}
-
 # ─── Branding ───────────────────────────────────────────
 show_branding() {
-    echo_color "$CYAN" "╔══════════════════════════════════════╗"
-    echo_color "$CYAN" "║    AUTO BUILD LEDE / OPENWRT SCRIPT  ║"
-    echo_color "$CYAN" "╚══════════════════════════════════════╝"
+    echo -e "${CYAN}"
+    echo "╔══════════════════════════════════════╗"
+    echo "║    AUTO BUILD LEDE / OPENWRT SCRIPT  ║"
+    echo "╚══════════════════════════════════════╝"
     echo "============== LEDE Firmware Autobuilder =============="
-    echo_color "$BLUE" "Firmware Modification Project"
-    echo_color "$BLUE" "Author: Pakalolo Waraso"
-    echo_color "$BLUE" "Special Thanks: Awiks Telegram Group"
-    echo_color "$BLUE" "Source: https://github.com/coolsnowwolf/lede"
-    echo_color "$BLUE" "Maintainer: https://github.com/BootLoopLover"
+    echo -e "${BLUE}Firmware Modification Project${NC}"
+    echo -e "${BLUE}Author: Pakalolo Waraso${NC}"
+    echo -e "${BLUE}Special Thanks: Awiks Telegram Group${NC}"
+    echo -e "${BLUE}Source: https://github.com/coolsnowwolf/lede${NC}"
+    echo -e "${BLUE}Maintainer: https://github.com/BootLoopLover${NC}"
     echo "======================================================="
-    echo ""
+    echo -e "${NC}"
 }
 
 # ─── Install Dependencies ───────────────────────────────
 install_dependencies() {
-    if ! grep -qEi 'ubuntu|debian' /etc/*release 2>/dev/null; then
-        echo_color "$RED" "[ERROR] Script ini hanya mendukung Debian/Ubuntu."
+    if ! grep -qiE 'ubuntu|debian' /etc/*release 2>/dev/null; then
+        echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
         exit 1
     fi
 
-    echo_color "$YELLOW" "[*] Memeriksa dan menginstall dependencies build..."
+    echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
     sudo apt-get update
     sudo apt-get install -y \
         build-essential flex bison g++ gawk gcc gettext git \
@@ -54,45 +51,41 @@ install_dependencies() {
         clang lld llvm libelf-dev device-tree-compiler \
         bc u-boot-tools qemu-utils asciidoc sudo time
 
-    echo_color "$GREEN" "[✔] Dependencies berhasil diinstall."
+    echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
 }
 
 # ─── Pilih Mode Build ───────────────────────────────────
 select_build_mode() {
-    while :; do
+    while true; do
         echo ""
         echo "============ Build Mode Selection =============="
         echo "1. Fresh Build (hapus dan clone ulang)"
         echo "2. Rebuild (lanjutkan direktori 'lede' yang ada)"
         echo "0. Exit"
         echo "================================================"
-        printf "Pilih (1/2/0): "
-        read mode
+        read -r -p "Pilih (1/2/0): " mode
 
         case "$mode" in
             1)
-                printf "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: "
-                read REPO
-                if [ -z "$REPO" ]; then
-                    REPO="https://github.com/coolsnowwolf/lede"
-                fi
+                read -r -p "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
+                REPO=${REPO:-https://github.com/coolsnowwolf/lede}
                 rm -rf "$LEDE_DIR"
                 git clone "$REPO" "$LEDE_DIR"
                 break
                 ;;
             2)
-                if [ ! -d "$LEDE_DIR" ]; then
-                    echo_color "$RED" "[ERROR] Folder '$LEDE_DIR' tidak ditemukan!"
+                if [[ ! -d "$LEDE_DIR" ]]; then
+                    echo -e "${RED}[ERROR] Folder '$LEDE_DIR' tidak ditemukan!${NC}"
                     exit 1
                 fi
                 break
                 ;;
             0)
-                echo_color "$YELLOW" "Keluar..."
+                echo -e "${YELLOW}Keluar...${NC}"
                 exit 0
                 ;;
             *)
-                echo_color "$RED" "Pilihan tidak valid."
+                echo -e "${RED}Pilihan tidak valid.${NC}"
                 ;;
         esac
     done
@@ -100,76 +93,62 @@ select_build_mode() {
 
 # ─── Masuk Folder LEDE ──────────────────────────────────
 run_in_lede_dir() {
-    cd "$LEDE_DIR" 2>/dev/null || {
-        echo_color "$RED" "[ERROR] Gagal masuk folder $LEDE_DIR"
+    cd "$LEDE_DIR" || {
+        echo -e "${RED}[ERROR] Gagal masuk folder $LEDE_DIR${NC}"
         exit 1
     }
 }
 
 # ─── Patch NAND (Opsional) ──────────────────────────────
 apply_nand_patch() {
-    if [ -d "../patch-nand" ]; then
-        echo_color "$YELLOW" "[*] Menerapkan patch NAND..."
+    if [[ -d ../patch-nand ]]; then
+        echo -e "${YELLOW}[*] Menerapkan patch NAND...${NC}"
         cp -rf ../patch-nand/* target/linux/
     fi
 }
 
 # ─── Fungsi Penggunaan Preset ───────────────────────────
 use_preset_menu() {
-    echo_color "$BLUE" "Gunakan preset konfigurasi?"
+    echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
     echo "1) ✅ Ya (untuk penggunaan pribadi)"
     echo "2) ❌ Tidak (konfigurasi manual)"
-    printf "📌 Pilih opsi [1-2]: "
-    read preset_answer
+    read -r -p "📌 Pilih opsi [1-2]: " preset_answer
 
-    if [ "$preset_answer" = "1" ]; then
-        if [ ! -d "../preset" ]; then
-            echo_color "$BLUE" "Meng-clone repository preset..."
-            git clone "https://github.com/BootLoopLover/preset.git" "../preset" || {
-                echo_color "$RED" "❌ Gagal clone preset."
+    if [[ "$preset_answer" == "1" ]]; then
+        if [[ ! -d ../preset ]]; then
+            echo -e "${BLUE}Meng-clone repository preset...${NC}"
+            git clone "https://github.com/BootLoopLover/preset.git" ../preset || {
+                echo -e "${RED}❌ Gagal clone preset.${NC}"
                 exit 1
             }
         fi
 
-        echo_color "$BLUE" "Daftar preset tersedia:"
-        # List folder preset manually
-        i=1
-        PRESET_FOLDERS=""
-        for d in ../preset/*/ ; do
-            foldername=$(basename "$d")
-            echo "$i) $foldername"
-            PRESET_FOLDERS="$PRESET_FOLDERS $foldername"
-            i=$((i+1))
+        echo -e "${BLUE}Daftar preset tersedia:${NC}"
+        mapfile -t folders < <(find ../preset -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        for i in "${!folders[@]}"; do
+            echo "$((i + 1))) ${folders[$i]}"
         done
 
-        printf "🔢 Pilih folder preset [1-$((i-1))]: "
-        read preset_choice
+        read -r -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
 
-        # Validasi input angka
-        expr "$preset_choice" + 1 >/dev/null 2>&1
-        if [ $? -ne 0 ] || [ "$preset_choice" -lt 1 ] || [ "$preset_choice" -ge "$i" ]; then
-            echo_color "$RED" "Pilihan preset tidak valid."
+        if [[ "$preset_choice" =~ ^[0-9]+$ ]] && (( preset_choice >= 1 && preset_choice <= ${#folders[@]} )); then
+            selected_folder="../preset/${folders[$((preset_choice - 1))]}"
+            if [[ -d "$selected_folder" ]]; then
+                cp -rf "$selected_folder"/* ./
+                if [[ -f "$selected_folder/config-nss" ]]; then
+                    cp "$selected_folder/config-nss" .config
+                fi
+            else
+                echo -e "${RED}Folder preset tidak ditemukan.${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${RED}Pilihan preset tidak valid.${NC}"
             exit 1
         fi
-
-        # Ambil nama folder berdasarkan index
-        count=1
-        for folder in $PRESET_FOLDERS; do
-            if [ "$count" -eq "$preset_choice" ]; then
-                selected_folder="../preset/$folder"
-                break
-            fi
-            count=$((count+1))
-        done
-
-        cp -rf "$selected_folder"/* ./
-        if [ -f "$selected_folder/config-nss" ]; then
-            cp "$selected_folder/config-nss" .config
-        fi
-
     else
         # Jika tidak pakai preset dan .config tidak ada, langsung menuconfig
-        if [ ! -f .config ]; then
+        if [[ ! -f .config ]]; then
             make menuconfig
         fi
     fi
@@ -177,34 +156,39 @@ use_preset_menu() {
 
 # ─── Konfigurasi Feed ───────────────────────────────────
 feed_configuration() {
-    echo_color "$YELLOW" "[*] Menambahkan feed tambahan..."
+    echo -e "${YELLOW}[*] Menambahkan feed tambahan...${NC}"
 
-    # Tambah baris jika belum ada
-    grep -q "src-git custompackage " feeds.conf.default 2>/dev/null || \
+    # Pastikan feeds.conf.default ada
+    if [[ ! -f feeds.conf.default ]]; then
+        echo -e "${RED}feeds.conf.default tidak ditemukan!${NC}"
+        exit 1
+    fi
+
+    if ! grep -q "src-git custompackage " feeds.conf.default; then
         echo 'src-git custompackage https://github.com/BootLoopLover/custom-package.git' >> feeds.conf.default
+    fi
 
-    grep -q "src-git php7package " feeds.conf.default 2>/dev/null || \
+    if ! grep -q "src-git php7package " feeds.conf.default; then
         echo 'src-git php7package https://github.com/BootLoopLover/openwrt-php7-package.git' >> feeds.conf.default
+    fi
 
-    while :; do
+    while true; do
         echo ""
         echo "=========== Feed Tambahan ==========="
         echo "1. Tambahkan feed custom manual"
         echo "2. Lewati"
         echo "====================================="
-        printf "Pilih (1/2): "
-        read FEED_OPT
+        read -r -p "Pilih (1/2): " FEED_OPT
         case "$FEED_OPT" in
             1)
-                printf "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): "
-                read LINE
+                read -r -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
                 echo "$LINE" >> feeds.conf.default
                 ;;
             2)
                 break
                 ;;
             *)
-                echo_color "$RED" "Pilihan tidak valid."
+                echo -e "${RED}Pilihan tidak valid.${NC}"
                 ;;
         esac
     done
@@ -212,7 +196,7 @@ feed_configuration() {
 
 # ─── Menu Update Feed dan Build ─────────────────────────
 feeds_and_build_menu() {
-    while :; do
+    while true; do
         echo ""
         echo "========= Menu Update & Build ========="
         echo "1. Update & install feeds + jalankan menuconfig"
@@ -220,54 +204,60 @@ feeds_and_build_menu() {
         echo "3. Mulai build firmware"
         echo "4. Keluar"
         echo "======================================="
-        printf "Pilih (1/2/3/4): "
-        read MENU_OPT
+        read -r -p "Pilih (1/2/3/4): " MENU_OPT
 
         case "$MENU_OPT" in
             1)
-                echo_color "$YELLOW" "[*] Update & install feeds..."
+                echo -e "${YELLOW}[*] Update & install feeds...${NC}"
                 ./scripts/feeds update -a
                 ./scripts/feeds install -a
-                echo_color "$CYAN" "[*] Menjalankan menuconfig..."
+                echo -e "${CYAN}[*] Menjalankan menuconfig...${NC}"
                 make menuconfig
                 ;;
             2)
                 make menuconfig
                 ;;
             3)
-                echo_color "$CYAN" "[*] Memulai proses build..."
+                echo -e "${CYAN}[*] Memulai proses build...${NC}"
                 if ! make -j"$(nproc)"; then
-                    echo_color "$YELLOW" "[!] Build gagal. Coba ulang dengan log verbose..."
+                    echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
                     make V=s
                 fi
                 END_TIME=$(date +%s)
-                echo_color "$GREEN" "[✔] Build selesai dalam $((END_TIME - START_TIME)) detik."
+                echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
                 ;;
             4)
-                echo_color "$YELLOW" "Keluar..."
+                echo -e "${YELLOW}Keluar...${NC}"
                 exit 0
                 ;;
             *)
-                echo_color "$RED" "Pilihan tidak valid."
+                echo -e "${RED}Pilihan tidak valid.${NC}"
                 ;;
         esac
     done
+}
+
+# ─── Build Firmware ─────────────────────────────────────
+start_build() {
+    echo -e "${CYAN}[*] Memulai proses build...${NC}"
+    if ! make -j"$(nproc)"; then
+        echo -e "${YELLOW}[!] Build gagal. Coba ulang dengan log verbose...${NC}"
+        make V=s
+    fi
+    END_TIME=$(date +%s)
+    echo -e "${GREEN}[✔] Build selesai dalam $((END_TIME - START_TIME)) detik.${NC}"
 }
 
 # ─── Main ───────────────────────────────────────────────
 main() {
     show_branding
 
-    printf "Install dependencies build? (y/n): "
-    read INSTALL_DEPS
-    case "$INSTALL_DEPS" in
-        y|Y)
-            install_dependencies
-            ;;
-        *)
-            echo_color "$YELLOW" "[*] Melewati instalasi dependencies..."
-            ;;
-    esac
+    read -r -p "Install dependencies build? (y/n): " INSTALL_DEPS
+    if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
+        install_dependencies
+    else
+        echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
+    fi
 
     select_build_mode
     run_in_lede_dir
