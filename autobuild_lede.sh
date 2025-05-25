@@ -194,9 +194,8 @@ fresh_build() {
     use_preset_menu
 
     echo -e "${BLUE}Updating and installing feeds...${NC}"
-    ./scripts/feeds update -a && ./scripts/feeds install -a
+    ./scripts/feeds update -a && ./scripts/feeds install -f -a
 
-    start_build
 }
 
 rebuild_mode() {
