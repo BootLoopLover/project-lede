@@ -91,6 +91,23 @@ apply_nand_patch() {
     fi
 }
 
+add_feeds() {
+    echo -e "${BLUE}Select additional feeds to include:${NC}"
+    echo "1) ❌ None"
+    echo "2) 🧪 Custom Feed"
+    echo "3) 🐘 PHP7 Feed"
+    echo "4) 🌐 Both Custom & PHP7"
+    echo "========================================================="
+    read -p "🔢 Select feed option [1-4]: " feed_choice
+    case "$feed_choice" in
+        2) echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default ;;
+        3) echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default ;;
+        4)
+            echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default
+            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default ;;
+    esac
+}
+
 # ─── Fungsi Penggunaan Preset ───────────────────────────
 use_preset_menu() {
     echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
@@ -200,6 +217,7 @@ main() {
     select_build_mode
     run_in_lede_dir
     apply_nand_patch
+    add_feeds
     use_preset_menu
     feeds_and_build_menu
 }
