@@ -31,25 +31,29 @@ show_branding() {
     echo -e "${NC}"
 }
 
-# ─── Install Dependencies ───────────────────────────────
-install_dependencies() {
-    if ! grep -qEi 'ubuntu|debian' /etc/*release; then
-        echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
-        exit 1
+# ─── Install Dependencies (Opsional) ───────────────────
+install_dependencies_prompt() {
+    read -rp "❓ Ingin install dependencies build? (y/n): " install_dep
+    if [[ "$install_dep" =~ ^[Yy]$ ]]; then
+        if ! grep -qEi 'ubuntu|debian' /etc/*release; then
+            echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
+            exit 1
+        fi
+
+        echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
+        sudo apt-get update
+        sudo apt-get install -y \
+            build-essential flex bison g++ gawk gcc gettext git \
+            libncurses5-dev libz-dev patch python3 \
+            rsync subversion unzip zlib1g-dev file wget libssl-dev \
+            ccache xsltproc libxml-parser-perl ecj fastjar \
+            java-propose-classpath libglib2.0-dev libfuse-dev \
+            clang lld llvm libelf-dev device-tree-compiler \
+            bc u-boot-tools qemu-utils asciidoc sudo time
+        echo -e "${GREEN}[✔] Dependencies berhasil diinstall.${NC}"
+    else
+        echo -e "${BLUE}[INFO] Melewati instalasi dependencies.${NC}"
     fi
-
-    echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y \
-        build-essential flex bison g++ gawk gcc gettext git \
-        libncurses5-dev libz-dev patch python3 \
-        rsync subversion unzip zlib1g-dev file wget libssl-dev \
-        ccache xsltproc libxml-parser-perl ecj fastjar \
-        java-propose-classpath libglib2.0-dev libfuse-dev \
-        clang lld llvm libelf-dev device-tree-compiler \
-        bc u-boot-tools qemu-utils asciidoc sudo time
-
-    echo -e "${GREEN}[\u2714] Dependencies berhasil diinstall.${NC}"
 }
 
 # ─── Pilih Mode Build ───────────────────────────────────
@@ -91,29 +95,12 @@ apply_nand_patch() {
     fi
 }
 
-add_feeds() {
-    echo -e "${BLUE}Select additional feeds to include:${NC}"
-    echo "1) ❌ None"
-    echo "2) 🧪 Custom Feed"
-    echo "3) 🐘 PHP7 Feed"
-    echo "4) 🌐 Both Custom & PHP7"
-    echo "========================================================="
-    read -p "🔢 Select feed option [1-4]: " feed_choice
-    case "$feed_choice" in
-        2) echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default ;;
-        3) echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default ;;
-        4)
-            echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default
-            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default ;;
-    esac
-}
-
-# ─── Fungsi Penggunaan Preset ───────────────────────────
+# ─── Gunakan Preset Config ──────────────────────────────
 use_preset_menu() {
     echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
-    echo "1) ✅ Ya (untuk penggunaan pribadi)"
-    echo "2) ❌ Tidak (konfigurasi manual)"
-    read -p "📌 Pilih opsi [1-2]: " preset_answer
+    echo "1) ✅ Ya (gunakan preset config)"
+    echo "2) ❌ Tidak (manual menuconfig)"
+    read -rp "📌 Pilih opsi [1-2]: " preset_answer
 
     if [[ "$preset_answer" == "1" ]]; then
         if [[ ! -d "../preset" ]]; then
@@ -130,7 +117,7 @@ use_preset_menu() {
             echo "$((i + 1))) ${folders[$i]}"
         done
 
-        read -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
+        read -rp "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
         selected_folder="../preset/${folders[$((preset_choice - 1))]}"
         cp -rf "$selected_folder"/* ./
 
@@ -142,60 +129,58 @@ use_preset_menu() {
     fi
 }
 
-# ─── Opsi Clean Build ───────────────────────────────────
-clean_build_menu() {
-    echo -e "${YELLOW}Apakah ingin melakukan clean build (hapus hasil kompilasi sebelumnya)?${NC}"
-    echo "1) Ya, bersihkan semua (make clean && make dirclean)"
-    echo "2) Tidak, lanjutkan tanpa clean build"
-    read -rp "Masukkan pilihan [1-2]: " clean_choice
+# ─── Clean Build (Opsional) ─────────────────────────────
+clean_build_prompt() {
+    echo -e "${YELLOW}Ingin lakukan clean build?${NC}"
+    echo "1) Ya (make clean && dirclean)"
+    echo "2) Tidak"
+    read -rp "Pilih [1-2]: " clean_choice
     case $clean_choice in
         1)
             echo -e "${BLUE}[INFO] Melakukan clean build...${NC}"
-            make clean
-            make dirclean
-            echo -e "${GREEN}[\u2714] Clean build selesai.${NC}"
+            make clean && make dirclean
+            echo -e "${GREEN}[✔] Clean build selesai.${NC}"
             ;;
         2)
-            echo -e "${BLUE}[INFO] Melewati tahap clean build.${NC}"
+            echo -e "${BLUE}[INFO] Melewati clean build.${NC}"
             ;;
         *)
-            echo -e "${RED}Pilihan tidak valid, melewati tahap clean build.${NC}"
+            echo -e "${RED}Pilihan tidak valid. Melewati clean build.${NC}"
             ;;
     esac
 }
 
-# ─── Menu Build ─────────────────────────────────────────
+# ─── Menu Build Firmware ────────────────────────────────
 feeds_and_build_menu() {
     while true; do
-        echo -e "${YELLOW}Pilih opsi:${NC}"
-        echo "1) Update feeds + make menuconfig"
-        echo "2) Make menuconfig"
+        echo -e "${YELLOW}Menu Build:${NC}"
+        echo "1) Update feeds + menuconfig"
+        echo "2) Hanya menuconfig"
         echo "3) Build firmware"
         echo "4) Keluar"
-        read -rp "Masukkan pilihan [1-4]: " choice
-        case $choice in
+        read -rp "Pilih opsi [1-4]: " choice
+
+        case "$choice" in
             1)
-                echo -e "${YELLOW}Update feeds dan run menuconfig...${NC}"
+                echo -e "${YELLOW}[•] Update feeds...${NC}"
                 ./scripts/feeds update -a
-                ./scripts/feeds install -a
-                echo -e "${GREEN}[\u2714] Feeds fully updates.${NC}"
-                echo -e "${YELLOW}Masuk menuconfig...${NC}"
+                ./scripts/feeds install -f -a
+                echo -e "${GREEN}[✔] Feeds update dan install selesai.${NC}"
                 make menuconfig
                 ;;
             2)
-                echo -e "${YELLOW}Masuk menuconfig...${NC}"
                 make menuconfig
                 ;;
             3)
-                clean_build_menu
-                echo -e "${YELLOW}Memulai build firmware...${NC}"
-                BUILD_START=$(date +%s)
+                clean_build_prompt
+                echo -e "${YELLOW}Mulai proses build...${NC}"
+                start_time=$(date +%s)
                 if make -j"$(nproc)"; then
-                    BUILD_END=$(date +%s)
-                    BUILD_DURATION=$((BUILD_END - BUILD_START))
-                    echo -e "${GREEN}[\u2714] Build selesai dalam waktu: $(date -u -d @$BUILD_DURATION +"%H:%M:%S")${NC}"
+                    end_time=$(date +%s)
+                    duration=$((end_time - start_time))
+                    echo -e "${GREEN}[✔] Build selesai dalam $(date -u -d @$duration +%H:%M:%S).${NC}"
                 else
-                    echo -e "${RED}[\u2718] Build gagal.${NC}"
+                    echo -e "${RED}[✘] Build gagal.${NC}"
                     exit 1
                 fi
                 ;;
@@ -204,20 +189,19 @@ feeds_and_build_menu() {
                 break
                 ;;
             *)
-                echo -e "${RED}Pilihan tidak valid.${NC}"
+                echo -e "${RED}[✘] Pilihan tidak valid.${NC}"
                 ;;
         esac
     done
 }
 
-# ─── Eksekusi Utama ─────────────────────────────────────
+# ─── Fungsi Utama ───────────────────────────────────────
 main() {
     show_branding
-    install_dependencies
+    install_dependencies_prompt
     select_build_mode
     run_in_lede_dir
     apply_nand_patch
-    add_feeds
     use_preset_menu
     feeds_and_build_menu
 }
