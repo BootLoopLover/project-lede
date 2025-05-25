@@ -112,7 +112,7 @@ use_preset_menu() {
         cp -rf "$selected_folder"/* ./
         [[ -f "$selected_folder/config-nss" ]] && cp "$selected_folder/config-nss" .config
     else
-        [[ ! -f .config ]] && make menuconfig
+        [[ ! -f .config ]] 
     fi
 }
 
