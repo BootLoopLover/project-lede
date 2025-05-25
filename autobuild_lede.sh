@@ -163,8 +163,14 @@ fresh_build() {
 
     checkout_tag
     add_feeds
-    ./scripts/feeds update -a && ./scripts/feeds install -a
+
+    # Copy preset config terlebih dahulu
     use_preset_menu
+
+    # Update & install feeds setelah preset dicopy
+    echo -e "${BLUE}Updating and installing feeds...${NC}"
+    ./scripts/feeds update -a && ./scripts/feeds install -a
+
     start_build
 }
 
