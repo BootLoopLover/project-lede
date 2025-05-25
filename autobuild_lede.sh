@@ -62,11 +62,11 @@ select_build_mode() {
         echo "2. Rebuild (lanjutkan direktori 'lede' yang ada)"
         echo "0. Exit"
         echo "================================================"
-        read -p "Pilih (1/2): " mode
+        read -rp "Pilih (1/2/0): " mode
 
         case "$mode" in
             1)
-                read -p "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
+                read -rp "Masukkan URL repo LEDE [default: https://github.com/coolsnowwolf/lede]: " REPO
                 REPO=${REPO:-https://github.com/coolsnowwolf/lede}
                 rm -rf "$LEDE_DIR"
                 git clone "$REPO" "$LEDE_DIR"
@@ -106,12 +106,12 @@ apply_nand_patch() {
     fi
 }
 
-# ─── Fungsi Penggunaan Preset (Menggantikan preset_configuration) ───────────────────────────────
+# ─── Fungsi Penggunaan Preset ───────────────────────────
 use_preset_menu() {
     echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
     echo "1) ✅ Ya (untuk penggunaan pribadi)"
     echo "2) ❌ Tidak (konfigurasi manual)"
-    read -p "📌 Pilih opsi [1-2]: " preset_answer
+    read -rp "📌 Pilih opsi [1-2]: " preset_answer
 
     if [[ "$preset_answer" == "1" ]]; then
         if [[ ! -d "../preset" ]]; then
@@ -128,14 +128,20 @@ use_preset_menu() {
             echo "$((i + 1))) ${folders[$i]}"
         done
 
-        read -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
-        selected_folder="../preset/${folders[$((preset_choice - 1))]}"
-        cp -rf "$selected_folder"/* ./
+        read -rp "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
 
-        if [[ -f "$selected_folder/config-nss" ]]; then
-            cp "$selected_folder/config-nss" .config
+        if [[ "$preset_choice" =~ ^[0-9]+$ ]] && (( preset_choice >= 1 && preset_choice <= ${#folders[@]} )); then
+            selected_folder="../preset/${folders[$((preset_choice - 1))]}"
+            cp -rf "$selected_folder"/* ./
+            if [[ -f "$selected_folder/config-nss" ]]; then
+                cp "$selected_folder/config-nss" .config
+            fi
+        else
+            echo -e "${RED}Pilihan preset tidak valid.${NC}"
+            exit 1
         fi
     else
+        # Jika tidak pakai preset dan .config tidak ada, langsung menuconfig
         [[ ! -f .config ]] && make menuconfig
     fi
 }
@@ -158,10 +164,10 @@ feed_configuration() {
         echo "1. Tambahkan feed custom manual"
         echo "2. Lewati"
         echo "====================================="
-        read -p "Pilih (1/2): " FEED_OPT
+        read -rp "Pilih (1/2): " FEED_OPT
         case "$FEED_OPT" in
             1)
-                read -p "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
+                read -rp "Masukkan baris feed (misal: src-git custom https://github.com/xxx.git): " LINE
                 echo "$LINE" >> feeds.conf.default
                 ;;
             2)
@@ -184,7 +190,7 @@ feeds_and_build_menu() {
         echo "3. Mulai build firmware"
         echo "4. Keluar"
         echo "======================================="
-        read -p "Pilih (1/2/3/4): " MENU_OPT
+        read -rp "Pilih (1/2/3/4): " MENU_OPT
 
         case "$MENU_OPT" in
             1)
@@ -232,8 +238,12 @@ start_build() {
 main() {
     show_branding
 
-    read -p "Install dependencies build? (y/n): " INSTALL_DEPS
-    [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]] && install_dependencies || echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
+    read -rp "Install dependencies build? (y/n): " INSTALL_DEPS
+    if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
+        install_dependencies
+    else
+        echo -e "${YELLOW}[*] Melewati instalasi dependencies...${NC}"
+    fi
 
     select_build_mode
     run_in_lede_dir
@@ -241,7 +251,6 @@ main() {
     use_preset_menu
     feed_configuration
     feeds_and_build_menu
-    start_build
 }
 
 main "$@"
