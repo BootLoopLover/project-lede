@@ -120,8 +120,8 @@ build_action_menu() {
     echo "========================================================="
     read -p "📌 Choice [1-6]: " choice
     case "$choice" in
-        1) ./scripts/feeds update -a && ./scripts/feeds install -a ;;
-        2) ./scripts/feeds update -a && ./scripts/feeds install -a; make menuconfig ;;
+        1) ./scripts/feeds update -a && ./scripts/feeds install -f -a ;;
+        2) ./scripts/feeds update -a && ./scripts/feeds install -f -a; make menuconfig ;;
         3) make menuconfig ;;
         4) return 0 ;;
         5) return 1 ;;
