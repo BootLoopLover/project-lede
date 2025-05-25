@@ -20,7 +20,7 @@ show_banner() {
         sleep 0.01
     done
     echo -e "\n"
-    for i in $(seq 1 60); do
+    for _ in {1..60}; do
         echo -ne "${BLUE}=${NC}"
         sleep 0.005
     done
@@ -43,7 +43,7 @@ show_banner() {
   LEDE Firmware Builder
 EOF
     echo -e "${NC}"
-    for i in $(seq 1 60); do
+    for _ in {1..60}; do
         echo -ne "${BLUE}-${NC}"
         sleep 0.005
     done
@@ -66,8 +66,13 @@ checkout_tag() {
         for i in "${!tag_list[@]}"; do
             echo "$((i+1))) ${tag_list[$i]}"
         done
-        read -p "🔖 Select tag to checkout [1-${#tag_list[@]}] or press Enter to skip: " tag_index
-        [[ -n "$tag_index" ]] && git checkout "${tag_list[$((tag_index-1))]}"
+        read -rp "🔖 Select tag to checkout [1-${#tag_list[@]}] or press Enter to skip: " tag_index
+        if [[ -n "$tag_index" && "$tag_index" =~ ^[0-9]+$ && "$tag_index" -ge 1 && "$tag_index" -le ${#tag_list[@]} ]]; then
+            git checkout "${tag_list[$((tag_index-1))]}" || {
+                echo -e "${RED}❌ Failed to checkout tag.${NC}"
+                exit 1
+            }
+        fi
     fi
 }
 
@@ -78,13 +83,21 @@ add_feeds() {
     echo "3) 🐘 PHP7 Feed"
     echo "4) 🌐 Both Custom & PHP7"
     echo "========================================================="
-    read -p "🔢 Select feed option [1-4]: " feed_choice
+    read -rp "🔢 Select feed option [1-4]: " feed_choice
     case "$feed_choice" in
-        2) echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default ;;
-        3) echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default ;;
+        2)
+            echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default
+            ;;
+        3)
+            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default
+            ;;
         4)
             echo "src-git custom https://github.com/BootLoopLover/custom-package" >> feeds.conf.default
-            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default ;;
+            echo "src-git php7 https://github.com/BootLoopLover/openwrt-php7-package" >> feeds.conf.default
+            ;;
+        *)
+            echo "No additional feeds added."
+            ;;
     esac
 }
 
@@ -92,27 +105,39 @@ use_preset_menu() {
     echo -e "${BLUE}Use preset configuration files?${NC}"
     echo "1) ✅ Yes (private use only)"
     echo "2) ❌ No (manual setup)"
-    read -p "📌 Choice [1-2]: " preset_answer
+    read -rp "📌 Choice [1-2]: " preset_answer
 
     if [[ "$preset_answer" == "1" ]]; then
-        [[ ! -d "../preset" ]] && {
+        if [[ ! -d "../preset" ]]; then
             echo -e "${BLUE}Cloning preset repository...${NC}"
             git clone "https://github.com/BootLoopLover/preset.git" "../preset" || {
-                echo -e "${RED}❌ Failed to clone preset.${NC}"; exit 1;
+                echo -e "${RED}❌ Failed to clone preset.${NC}"
+                exit 1
             }
-        }
+        fi
 
         echo -e "${BLUE}Available presets:${NC}"
         mapfile -t folders < <(find ../preset -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        if [[ ${#folders[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ No preset folders found.${NC}"
+            return
+        fi
         for i in "${!folders[@]}"; do
             echo "$((i+1))) ${folders[$i]}"
         done
-        read -p "🔢 Select preset folder [1-${#folders[@]}]: " preset_choice
-        selected_folder="../preset/${folders[$((preset_choice-1))]}"
-        cp -rf "$selected_folder"/* ./
-        [[ -f "$selected_folder/config-nss" ]] && cp "$selected_folder/config-nss" .config
+        read -rp "🔢 Select preset folder [1-${#folders[@]}]: " preset_choice
+        if [[ "$preset_choice" =~ ^[0-9]+$ && "$preset_choice" -ge 1 && "$preset_choice" -le ${#folders[@]} ]]; then
+            selected_folder="../preset/${folders[$((preset_choice-1))]}"
+            cp -rf "$selected_folder"/* ./
+            if [[ -f "$selected_folder/config-nss" ]]; then
+                cp "$selected_folder/config-nss" .config
+            fi
+        else
+            echo -e "${RED}⚠️ Invalid preset selection.${NC}"
+        fi
     else
-        [[ ! -f .config ]] 
+        # Jika pilih manual, pastikan .config ada atau user akan buat sendiri nanti
+        [[ ! -f .config ]] && echo -e "${YELLOW}⚠️ No .config file found, you'll need to create one manually later.${NC}"
     fi
 }
 
@@ -125,15 +150,31 @@ build_action_menu() {
     echo "5) 🔙 Back"
     echo "6) ❌ Exit"
     echo "========================================================="
-    read -p "📌 Choice [1-6]: " choice
+    read -rp "📌 Choice [1-6]: " choice
     case "$choice" in
-        1) ./scripts/feeds update -a && ./scripts/feeds install -f -a ;;
-        2) ./scripts/feeds update -a && ./scripts/feeds install -f -a; make menuconfig ;;
-        3) make menuconfig ;;
-        4) return 0 ;;
-        5) return 1 ;;
-        6) echo -e "${GREEN}👋 Exit.${NC}"; exit 0 ;;
-        *) echo -e "${RED}⚠️ Invalid input.${NC}" ;;
+        1)
+            ./scripts/feeds update -a && ./scripts/feeds install -f -a
+            ;;
+        2)
+            ./scripts/feeds update -a && ./scripts/feeds install -f -a
+            make menuconfig
+            ;;
+        3)
+            make menuconfig
+            ;;
+        4)
+            return 0
+            ;;
+        5)
+            return 1
+            ;;
+        6)
+            echo -e "${GREEN}👋 Exit.${NC}"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}⚠️ Invalid input.${NC}"
+            ;;
     esac
     return 1
 }
@@ -141,10 +182,10 @@ build_action_menu() {
 start_build() {
     echo -e "${GREEN}🚀 Starting build...${NC}"
     start_time=$(date +%s)
-    if make -j$(nproc); then
+    if make -j"$(nproc)"; then
         echo -e "${GREEN}✅ Build success!${NC}"
     else
-        echo -e "${RED}⚠️ Build failed, retrying...${NC}"
+        echo -e "${RED}⚠️ Build failed, retrying with verbose...${NC}"
         make -j1 V=s
     fi
     end_time=$(date +%s)
@@ -153,7 +194,7 @@ start_build() {
 }
 
 fresh_build() {
-    read -p "📁 Enter build folder name (default: lede_build): " folder_name
+    read -rp "📁 Enter build folder name (default: lede_build): " folder_name
     folder_name="${folder_name:-lede_build}"
     mkdir -p "$folder_name" || { echo -e "${RED}❌ Failed to create folder.${NC}"; exit 1; }
     cd "$folder_name" || exit 1
@@ -163,11 +204,8 @@ fresh_build() {
 
     checkout_tag
     add_feeds
-
-    # Copy preset config terlebih dahulu
     use_preset_menu
 
-    # Update & install feeds setelah preset dicopy
     echo -e "${BLUE}Updating and installing feeds...${NC}"
     ./scripts/feeds update -a && ./scripts/feeds install -a
 
@@ -178,16 +216,20 @@ rebuild_mode() {
     while true; do
         show_banner
         echo -e "📂 ${BLUE}Select existing build folder:${NC}"
-        mapfile -t folders < <(find . -maxdepth 1 -type d \( ! -name . \))
+        mapfile -t folders < <(find . -maxdepth 1 -type d \( ! -name . \) -printf '%f\n')
+        if [[ ${#folders[@]} -eq 0 ]]; then
+            echo -e "${RED}❌ No build folders found in current directory.${NC}"
+            exit 1
+        fi
         for i in "${!folders[@]}"; do
-            echo "$((i+1))) ${folders[$i]##*/}"
+            echo "$((i+1))) ${folders[$i]}"
         done
-        echo "❌ 0) Exit"
-        read -p "📌 Choice [0-${#folders[@]}]: " choice
+        echo "0) ❌ Exit"
+        read -rp "📌 Choice [0-${#folders[@]}]: " choice
 
-        if [[ "$choice" == 0 ]]; then
+        if [[ "$choice" == "0" ]]; then
             echo -e "${GREEN}👋 Exiting...${NC}"; exit 0
-        elif [[ "$choice" =~ ^[0-9]+$ && "$choice" -le "${#folders[@]}" ]]; then
+        elif [[ "$choice" =~ ^[0-9]+$ && "$choice" -ge 1 && "$choice" -le ${#folders[@]} ]]; then
             folder="${folders[$((choice-1))]}"
             cd "$folder" || continue
             while ! build_action_menu; do :; done
@@ -200,18 +242,20 @@ rebuild_mode() {
 }
 
 main_menu() {
-    show_banner
-    echo "1️⃣ Fresh build (baru)"
-    echo "2️⃣ Rebuild existing folder"
-    echo "3️⃣ ❌ Exit"
-    echo "========================================================="
-    read -p "📌 Select option [1-3]: " main_choice
-    case "$main_choice" in
-        1) fresh_build ;;
-        2) rebuild_mode ;;
-        3) echo -e "${GREEN}👋 Exiting...${NC}"; exit 0 ;;
-        *) echo -e "${RED}⚠️ Invalid choice.${NC}"; exit 1 ;;
-    esac
+    while true; do
+        show_banner
+        echo "1️⃣ Fresh build (baru)"
+        echo "2️⃣ Rebuild existing folder"
+        echo "3️⃣ ❌ Exit"
+        echo "========================================================="
+        read -rp "📌 Select option [1-3]: " main_choice
+        case "$main_choice" in
+            1) fresh_build; break ;;
+            2) rebuild_mode; break ;;
+            3) echo -e "${GREEN}👋 Exiting...${NC}"; exit 0 ;;
+            *) echo -e "${RED}⚠️ Invalid choice.${NC}" ;;
+        esac
+    done
 }
 
 # === Run ===
