@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #--------------------------------------------------------
 # 🚀 LEDE Builder - Professional Version
@@ -177,20 +178,6 @@ build_action_menu() {
             ;;
     esac
     return 1
-}
-
-start_build() {
-    echo -e "${GREEN}🚀 Starting build...${NC}"
-    start_time=$(date +%s)
-    if make -j"$(nproc)"; then
-        echo -e "${GREEN}✅ Build success!${NC}"
-    else
-        echo -e "${RED}⚠️ Build failed, retrying with verbose...${NC}"
-        make -j1 V=s
-    fi
-    end_time=$(date +%s)
-    elapsed=$((end_time - start_time))
-    echo -e "${BLUE}⏱️ Build completed in $((elapsed / 60)) minute(s) and $((elapsed % 60)) second(s).${NC}"
 }
 
 fresh_build() {
