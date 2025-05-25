@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #--------------------------------------------------------
 # LEDE Firmware Autobuild Script - Final Version
 # Author: Pakalolo Waraso
@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
-NC='\033[0m'  # No Color
+NC='\033[0m'
 
 LEDE_DIR="lede"
 
@@ -40,6 +40,7 @@ install_dependencies_prompt() {
                 echo -e "${RED}[ERROR] Script ini hanya mendukung Debian/Ubuntu.${NC}"
                 exit 1
             fi
+
             echo -e "${YELLOW}[*] Memeriksa dan menginstall dependencies build...${NC}"
             sudo apt-get update
             sudo apt-get install -y \
@@ -64,7 +65,7 @@ select_build_mode() {
     echo "1) Fresh build (clone ulang LEDE)"
     echo "2) Rebuild dari folder yang sudah ada"
     read -rp "Masukkan pilihan [1-2]: " mode
-    case "$mode" in
+    case $mode in
         1)
             echo -e "${BLUE}[INFO] Melakukan fresh clone dari repo LEDE...${NC}"
             rm -rf "$LEDE_DIR"
@@ -126,12 +127,12 @@ apply_nand_patch() {
     fi
 }
 
-# ─── Gunakan Preset Konfigurasi ─────────────────────────
+# ─── Fungsi Penggunaan Preset (Tanpa mapfile agar kompatibel) ─────────────
 use_preset_menu() {
     echo -e "${BLUE}Gunakan preset konfigurasi?${NC}"
     echo "1) ✅ Ya (untuk penggunaan pribadi)"
     echo "2) ❌ Tidak (konfigurasi manual)"
-    read -rp "📌 Pilih opsi [1-2]: " preset_answer
+    read -p "📌 Pilih opsi [1-2]: " preset_answer
 
     if [[ "$preset_answer" == "1" ]]; then
         if [[ ! -d "../preset" ]]; then
@@ -143,12 +144,16 @@ use_preset_menu() {
         fi
 
         echo -e "${BLUE}Daftar preset tersedia:${NC}"
-        mapfile -t folders < <(find ../preset -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+        folders=()
+        for d in ../preset/*/ ; do
+            [ -d "$d" ] && folders+=("$(basename "$d")")
+        done
+
         for i in "${!folders[@]}"; do
             echo "$((i + 1))) ${folders[$i]}"
         done
 
-        read -rp "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
+        read -p "🔢 Pilih folder preset [1-${#folders[@]}]: " preset_choice
         selected_folder="../preset/${folders[$((preset_choice - 1))]}"
         cp -rf "$selected_folder"/* ./
 
@@ -166,7 +171,7 @@ clean_build_menu() {
     echo "1) Ya, bersihkan semua (make clean && make dirclean)"
     echo "2) Tidak, lanjutkan tanpa clean build"
     read -rp "Masukkan pilihan [1-2]: " clean_choice
-    case "$clean_choice" in
+    case $clean_choice in
         1)
             echo -e "${BLUE}[INFO] Melakukan clean build...${NC}"
             make clean
@@ -182,7 +187,7 @@ clean_build_menu() {
     esac
 }
 
-# ─── Menu Build Utama ───────────────────────────────────
+# ─── Menu Build (Update Feeds + Build) ─────────────────
 feeds_and_build_menu() {
     while true; do
         echo -e "${YELLOW}Pilih opsi:${NC}"
@@ -191,12 +196,12 @@ feeds_and_build_menu() {
         echo "3) Build firmware"
         echo "4) Keluar"
         read -rp "Masukkan pilihan [1-4]: " choice
-        case "$choice" in
+        case $choice in
             1)
-                echo -e "${YELLOW}Update feeds dan jalankan menuconfig...${NC}"
+                echo -e "${YELLOW}Update feeds dan run menuconfig...${NC}"
                 ./scripts/feeds update -a
                 ./scripts/feeds install -f -a
-                echo -e "${GREEN}[✔] Feeds berhasil diperbarui.${NC}"
+                echo -e "${GREEN}[✔] Feeds berhasil diupdate.${NC}"
                 echo -e "${YELLOW}Masuk menuconfig...${NC}"
                 make menuconfig
                 ;;
@@ -228,16 +233,4 @@ feeds_and_build_menu() {
     done
 }
 
-# ─── Main Script Execution ──────────────────────────────
-main() {
-    show_branding
-    install_dependencies_prompt
-    select_build_mode
-    run_in_lede_dir
-    add_extra_feeds
-    apply_nand_patch
-    use_preset_menu
-    feeds_and_build_menu
-}
-
-main
+# ─── Eksekusi Utama ─────────────────────────────────────
