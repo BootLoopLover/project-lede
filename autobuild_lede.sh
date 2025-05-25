@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #--------------------------------------------------------
 # LEDE Firmware Autobuild Script - Final Version
 # Author: Pakalolo Waraso
